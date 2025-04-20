@@ -85,10 +85,36 @@ ClothesTypeDemo/
     *   *提醒: `data/` 目录及其内容默认不会被提交到 Git 仓库 (已在 `.gitignore` 中配置)。*
 3.  **运行应用:** 
     *   确保你处于激活的虚拟环境中。
-    *   在项目根目录下运行 Streamlit 命令: 
+    *   在项目根目录下运行基本的 Streamlit 命令:
         ```bash
         streamlit run main_ui.py
         ```
+    *   **常用启动选项:** 你可以在运行命令时添加参数来调整 Streamlit 的行为。以下是一些例子：
+        *   **禁用文件监视器:** (避免意外重启)
+          ```bash
+          streamlit run main_ui.py --server.fileWatcherType=none
+          ```
+        *   **指定端口:** (如果默认端口 8501 被占用)
+          ```bash
+          streamlit run main_ui.py --server.port 8502
+          ```
+        *   **设置日志级别:** (用于调试，可选级别: `error`, `warning`, `info`, `debug`)
+          ```bash
+          streamlit run main_ui.py --logger.level debug
+          ```
+    *   **高级配置 (如日志到文件):** 
+        *   更复杂的配置，例如将日志记录到特定文件，通常不是通过命令行参数直接完成的。
+        *   推荐的方式是在项目根目录下创建一个 `.streamlit/config.toml` 文件来配置这些选项。例如，在 `config.toml` 中添加以下内容可以设置日志级别并输出到文件：
+          ```toml
+          [logger]
+          level = "info" # 设置日志级别
+          # messageFormat = ... # 可选：自定义日志格式
+
+          [server]
+          # runOnSave = true # 可选：保存时自动重新运行
+          # headless = true # 可选：无浏览器模式运行
+          ```
+          *请注意，直接将日志输出到文件的配置可能需要更复杂的设置或在 Python 代码中使用 `logging` 模块处理。请参考 Streamlit 官方文档获取详细信息。*
 
 ## 功能详解
 
