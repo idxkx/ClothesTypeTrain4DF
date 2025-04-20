@@ -1,0 +1,33 @@
+# Editor/IDE specific
+.cursor/
+
+# Datasets and Models (Project Specific)
+Anno_fine/
+models/
+
+# Log files
+*.log
+
+# Python cache files and byte-compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment directories
+venv/
+.venv/
+env/
+.env/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Optional: Build/distribution artifacts (Uncomment if needed)
+# build/
+# dist/
+# *.egg-info/
+
+# Optional: Environment variables file (Uncomment if needed)
+# .env

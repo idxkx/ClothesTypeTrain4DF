@@ -1,0 +1,8 @@
+streamlit
+torch
+torchvision
+pandas  # 用于方便地读取标注文件
+pillow  # 用于图像处理
+scikit-learn # 可能用于指标计算或数据划分
+
+# 后续根据需要添加其他库，例如用于绘图的 matplotlib 或 plotly 
