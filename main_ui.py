@@ -753,6 +753,7 @@ if start_training:
         "strategy": strategy_choice,
         "parameters": args, # 保存训练参数
         "backbone": backbone,
+        "anno_dir": anno_dir_input, # 明确保存Anno_fine目录路径
         "status": "进行中",
         "total_epochs": epochs,
         "completed_epochs": 0,

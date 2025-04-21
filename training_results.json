@@ -82,5 +82,33 @@
         "end_time_str": "2025-04-21 08:17:34",
         "duration": 1402.6135489940643,
         "duration_str": "0:23:22"
+    },
+    {
+        "start_time": 1745197001.5693133,
+        "start_time_str": "2025-04-21 08:56:41",
+        "model_name": "my_clothes_model",
+        "strategy": "均衡推荐 (Balanced)",
+        "parameters": {
+            "epochs": 15,
+            "batch_size": 32,
+            "learning_rate": 0.0001,
+            "device": "cuda:0",
+            "model_save_path": ".\\models\\my_clothes_model",
+            "attribute_loss_weight": 1.0,
+            "num_workers": 0
+        },
+        "backbone": "efficientnet_b3",
+        "status": "已完成",
+        "total_epochs": 15,
+        "completed_epochs": 15,
+        "best_val_loss": 1.4717238903045655,
+        "best_epoch": 2,
+        "best_model_path": ".\\models\\my_clothes_model\\best_model_my_clothes_model_epoch2.pth",
+        "diagnostic_summary": "### 🩺 训练诊断报告\n- **训练轮数:** 15 / 15\n- **最佳验证损失:** 1.4717 (出现在 Epoch 2)\n- **最终验证损失:** 2.4417\n- **最终验证准确率:** 61.80%\n- **收敛性:** ❌ 验证损失在最后5轮未能持续下降，可能已收敛或遇到瓶颈。\n- **过拟合风险:** 高 (基于最终损失差异 2.30 和准确率差异 37.5%) \n  - _建议: 可尝试增加正则化、数据增强或提前停止。_",
+        "functional_test_result": "成功",
+        "end_time": 1745201372.6264043,
+        "end_time_str": "2025-04-21 10:09:32",
+        "duration": 4371.057090997696,
+        "duration_str": "1:12:51"
     }
 ]

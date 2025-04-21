@@ -17,6 +17,9 @@ ATTRIBUTE_FILE = "list_attr_cloth.txt"
 # --- 新增：映射文件常量 --- 
 MAPPING_FILE = "../name_mapping.json" 
 
+# 添加默认Anno_fine路径常量
+DEFAULT_ANNO_DIR = r"E:\AIModels\DeepFashion\DeepFashion\Category and Attribute Prediction Benchmark\Anno_fine"
+
 # --- 模型导入 ---
 # 假设 model.py 在项目根目录
 import sys
@@ -123,6 +126,10 @@ st.set_page_config(page_title="模型效果测试", layout="wide")
 st.title("🧪 模型效果测试")
 st.markdown("从训练好的模型中选择一个，上传服装图片，查看识别结果。")
 
+# 设置初始状态，默认为下拉列表选择模式
+if "using_dropdown_selection" not in st.session_state:
+    st.session_state.using_dropdown_selection = True
+
 # --- 加载和选择模型 ---
 all_results = load_results()
 # 筛选出成功的训练运行
@@ -141,65 +148,24 @@ if successful_runs:
         model_options[option_label] = {
             "path": os.path.join(os.path.dirname(__file__), '..', run["best_model_path"]), 
             "backbone": run.get("backbone"),
-            # --- 修改：直接存储 anno_dir --- 
-            "anno_dir": run.get("parameters", {}).get("anno_dir_input", None) # 从原始参数获取
+            # 使用默认路径作为备选
+            "anno_dir": run.get("anno_dir", DEFAULT_ANNO_DIR) 
         }
 else:
-    st.warning("下拉列表中没有找到符合条件的模型记录。你可以尝试在下方手动指定模型路径。")
+    st.warning("没有找到符合条件的训练好的模型记录。请先在主页面完成模型训练。")
 
+# 简化UI，只使用下拉列表选择模型
 st.selectbox(
-    "通过下拉列表选择模型 (推荐):",
+    "选择一个训练好的模型:",
     list(model_options.keys()),
     key="selected_model_dropdown"
 )
 
 selected_model_info = model_options.get(st.session_state.selected_model_dropdown)
 
-# --- 手动指定模型路径 --- 
-st.markdown("--- ")
-st.markdown("**或者，手动指定模型文件路径进行测试：**")
-manual_model_path_input = st.text_input(
-    "模型文件绝对路径 (.pth):",
-    key="manual_model_path", # Add key for state tracking
-    help="输入你想要测试的模型文件的完整路径，例如 C:\path\to\your\model.pth"
-)
-manual_backbone_input = st.text_input(
-    "该模型使用的骨干网络名称:",
-    key="manual_backbone", # Add key
-    help="输入与上述模型文件匹配的 Backbone 名称，例如 efficientnet_b3"
-)
-
-# --- 恢复 Anno_fine 路径输入框，并使其根据上下文显示/填充 --- 
-st.markdown("--- ")
-anno_dir = None
-show_anno_input = True # Default to showing the input
-
-if st.session_state.selected_model_dropdown != "请选择模型" and selected_model_info:
-    # If dropdown is used and info is valid
-    retrieved_anno_dir = selected_model_info.get("anno_dir")
-    if retrieved_anno_dir and os.path.isdir(retrieved_anno_dir):
-        anno_dir = retrieved_anno_dir # Use the retrieved path
-        show_anno_input = False # Hide the input box if path is valid
-    # If retrieved_anno_dir is invalid or missing, show_anno_input remains True
-
-# Only show the input field if necessary
-anno_dir_input_value = anno_dir if anno_dir else "" # Default value for input
-if show_anno_input:
-    st.warning("需要提供 Anno_fine 目录以解释模型输出。")
-    anno_dir_input_field = st.text_input(
-        "Anno_fine 目录绝对路径:",
-        value=anno_dir_input_value,
-        key="anno_dir_input", # Add key
-        help="包含 list_category_cloth.txt 和 list_attr_cloth.txt 的目录。"
-    )
-else:
-    st.success(f"已自动从训练记录加载 Anno_fine 目录: `{anno_dir}`")
-    # Keep the key in session state even if hidden, for consistency
-    if "anno_dir_input" not in st.session_state:
-        st.session_state.anno_dir_input = anno_dir
-    else:
-        st.session_state.anno_dir_input = anno_dir # Ensure it's updated
-    anno_dir_input_field = anno_dir # Use the automatically found dir
+# 如果选择了模型，显示模型信息
+if selected_model_info:
+    st.success(f"已选择模型，骨干网络: {selected_model_info.get('backbone', '未知')}")
 
 # --- 图片上传 ---
 uploaded_file = st.file_uploader(
@@ -220,139 +186,222 @@ if uploaded_file is not None:
         uploaded_file = None # 阻止后续处理
 
 if st.button("🚀 开始识别！"):
-    # --- 确定要使用的模型信息 和 Anno Dir --- 
-    model_to_use = None
-    backbone_to_use = None
-    path_to_use = None
-    # --- 修改：从 session_state 或自动获取 anno_dir --- 
-    final_anno_dir = None 
-
-    # Determine model path and backbone first
-    use_manual_path = bool(st.session_state.get("manual_model_path"))
-    if use_manual_path:
-        st.write("使用手动指定的模型路径进行识别...")
-        manual_path = st.session_state.manual_model_path
-        manual_backbone = st.session_state.get("manual_backbone")
-        if not os.path.exists(manual_path):
-            st.error(f"错误：手动指定的模型路径不存在: {manual_path}")
-        elif not manual_path.endswith(".pth"):
-            st.error("错误：手动指定的模型路径必须指向一个 .pth 文件。")
-        elif not manual_backbone:
-            st.error("错误：使用手动路径时，必须同时指定骨干网络名称。")
-        else:
-            path_to_use = manual_path
-            backbone_to_use = manual_backbone
-            # For manual path, anno_dir MUST come from the input field
-            if show_anno_input: # If the input field was shown
-                 final_anno_dir = st.session_state.get("anno_dir_input")
-                 if not final_anno_dir or not os.path.isdir(final_anno_dir):
-                      st.error(f"错误：使用手动模型路径时，请在上方输入有效的 Anno_fine 目录路径。")
-                      path_to_use = None # Prevent proceeding
-            else:
-                 # This case should theoretically not happen if logic is correct
-                 # but as a safeguard, try to use the auto-retrieved one
-                 final_anno_dir = anno_dir 
-                 if not final_anno_dir or not os.path.isdir(final_anno_dir):
-                      st.error(f"错误：无法确定 Anno_fine 目录路径。")
-                      path_to_use = None
-
-    elif selected_model_info: # Using dropdown
-        st.write("使用下拉列表选择的模型进行识别...")
+    # 简化逻辑，只处理下拉列表选择的情况
+    if not selected_model_info:
+        st.error("请先从下拉列表中选择一个模型。")
+    elif not uploaded_file:
+        st.error("请先上传一张图片。")
+    else:
+        # 获取模型信息
         path_to_use = selected_model_info.get("path")
         backbone_to_use = selected_model_info.get("backbone")
-        retrieved_anno_dir = selected_model_info.get("anno_dir")
+        final_anno_dir = selected_model_info.get("anno_dir")
+        
+        # 添加调试信息
+        st.write(f"模型路径: {path_to_use}")
+        st.write(f"骨干网络: {backbone_to_use}")
+        st.write(f"Anno目录: {final_anno_dir}")
+        st.write(f"目录存在: {os.path.isdir(final_anno_dir) if final_anno_dir else False}")
 
+        # 使用布尔标志控制流程
+        should_proceed = True
+        
+        # 检查必要信息是否完整
         if not path_to_use or not backbone_to_use:
-             st.error("错误：从下拉列表选择的模型信息不完整 (路径或Backbone)。")
-             path_to_use = None 
-        elif retrieved_anno_dir and os.path.isdir(retrieved_anno_dir):
-             final_anno_dir = retrieved_anno_dir # Use the valid retrieved path
-        else:
-             # Dropdown used, but anno_dir was missing or invalid, check input field
-             if show_anno_input: # Input field should be visible in this case
-                  final_anno_dir = st.session_state.get("anno_dir_input")
-                  if not final_anno_dir or not os.path.isdir(final_anno_dir):
-                       st.error(f"错误：无法从训练记录获取 Anno_fine 目录，请在上方输入有效路径。")
-                       path_to_use = None # Prevent proceeding
-             else:
-                 # Should not happen if show_anno_input logic is correct
-                 st.error("内部错误：无法确定 Anno_fine 目录路径。")
-                 path_to_use = None
-    else:
-        st.error("请先通过下拉列表选择一个模型，或手动指定模型路径。")
-    # --- 模型信息和 Anno Dir 确定结束 ---
+            st.error("错误：选择的模型信息不完整 (路径或Backbone)。")
+            should_proceed = False
+        elif not final_anno_dir:
+            st.error(f"错误：模型记录中没有Anno_fine目录路径。")
+            should_proceed = False
+        elif not os.path.isdir(final_anno_dir):
+            # 如果目录不存在，尝试使用默认目录
+            st.warning(f"指定的Anno_fine目录不存在: {final_anno_dir}")
+            if os.path.isdir(DEFAULT_ANNO_DIR):
+                st.info(f"使用默认Anno_fine目录: {DEFAULT_ANNO_DIR}")
+                final_anno_dir = DEFAULT_ANNO_DIR
+            else:
+                st.error(f"默认Anno_fine目录也不存在: {DEFAULT_ANNO_DIR}")
+                should_proceed = False
+        
+        # 只有当所有条件都满足时才继续处理
+        if should_proceed:
+            # 所有信息都完整，开始处理
+            model_path = path_to_use
+            backbone = backbone_to_use
+            num_categories = 50 
+            num_attributes = 26 
 
-    # --- 后续逻辑使用 path_to_use, backbone_to_use, final_anno_dir --- 
-    if path_to_use and backbone_to_use and final_anno_dir and uploaded_file:
-        # --- anno_dir 已确定，不再需要检查 anno_dir_input ---
+            # 加载类别和属性名称
+            category_names_en = load_category_names(final_anno_dir)
+            attribute_names_en = load_attribute_names(final_anno_dir)
 
-        model_path = path_to_use
-        backbone = backbone_to_use
-        num_categories = 50 
-        num_attributes = 26 
+            if category_names_en is None or attribute_names_en is None:
+                st.error("无法加载类别或属性名称，无法继续识别。")
+            else:
+                # 开始识别流程
+                with st.spinner("正在加载模型并进行识别..."):
+                    try:
+                        # 1. 加载模型
+                        model = ClothesModel(num_categories=num_categories, backbone=backbone)
+                        # 尝试自动选择设备
+                        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                        model.load_state_dict(torch.load(model_path, map_location=device))
+                        model.to(device)
+                        model.eval()
 
-        # 加载类别和属性名称 (使用确定的 final_anno_dir)
-        category_names_en = load_category_names(final_anno_dir)
-        attribute_names_en = load_attribute_names(final_anno_dir)
+                        # 2. 预处理图片
+                        img_tensor = eval_transform(image).unsqueeze(0).to(device) # 添加 batch 维度
 
-        if category_names_en is None or attribute_names_en is None:
-            st.error("无法加载类别或属性名称，无法继续识别。")
-        else:
-            # --- 开始处理 ---
-            with st.spinner("正在加载模型并进行识别..."):
-                try:
-                    # 1. 加载模型
-                    model = ClothesModel(num_categories=num_categories, backbone=backbone)
-                    # 尝试自动选择设备
-                    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-                    model.load_state_dict(torch.load(model_path, map_location=device))
-                    model.to(device)
-                    model.eval()
+                        # 3. 模型推理
+                        with torch.no_grad():
+                            cat_logits, attr_logits = model(img_tensor)
 
-                    # 2. 预处理图片
-                    img_tensor = eval_transform(image).unsqueeze(0).to(device) # 添加 batch 维度
+                        # 4. 解析结果
+                        # 类别 - 获取所有类别的概率分布
+                        cat_probs = torch.softmax(cat_logits, dim=1).squeeze(0).cpu().numpy()
+                        
+                        # 创建类别索引、名称和概率的列表
+                        cat_data = []
+                        for idx in range(len(cat_probs)):
+                            cat_id = idx + 1  # 类别ID从1开始
+                            en_cat_name = category_names_en.get(cat_id, f"Unknown (ID: {cat_id})")
+                            zh_cat_name = category_mapping.get(en_cat_name)
+                            display_cat_name = f"{zh_cat_name} ({en_cat_name})" if zh_cat_name else en_cat_name
+                            cat_data.append({
+                                'index': cat_id,
+                                'name': display_cat_name,
+                                'probability': cat_probs[idx]
+                            })
+                        
+                        # 按概率降序排序
+                        cat_data.sort(key=lambda x: x['probability'], reverse=True)
+                        
+                        # 获取概率最高的类别
+                        top_category = cat_data[0]
+                        
+                        # 属性 (使用 Sigmoid 获取所有属性的概率)
+                        attr_probs = torch.sigmoid(attr_logits).squeeze(0).cpu().numpy()
+                        
+                        # 创建属性索引、名称和概率的列表
+                        attr_data = []
+                        for idx, prob in enumerate(attr_probs):
+                            en_attr_name = attribute_names_en.get(idx, f"Unknown Attr (Idx: {idx})")
+                            zh_attr_name = attribute_mapping.get(en_attr_name)
+                            display_attr_name = f"{zh_attr_name} ({en_attr_name})" if zh_attr_name else en_attr_name
+                            attr_data.append({
+                                'index': idx,
+                                'name': display_attr_name, 
+                                'probability': prob
+                            })
+                        
+                        # 按概率降序排序
+                        attr_data.sort(key=lambda x: x['probability'], reverse=True)
+                        
+                        # 5. 显示结果
+                        with col_results:
+                            st.subheader("识别结果:")
+                            
+                            # 显示类别预测结果
+                            st.markdown("**预测类别及概率:**")
+                            # 显示前3个最可能的类别
+                            cols_cat = st.columns(3)
+                            for i, cat in enumerate(cat_data[:3]):
+                                with cols_cat[i]:
+                                    if i == 0:  # 最高概率用绿色
+                                        st.success(f"{cat['name']} ({cat['probability']*100:.1f}%)")
+                                    else:  # 其他候选用蓝色
+                                        st.info(f"{cat['name']} ({cat['probability']*100:.1f}%)")
+                            
+                            # 类别详情折叠面板
+                            with st.expander("查看所有类别概率详情"):
+                                # 显示前10个最可能的类别
+                                st.markdown("##### 前10个最可能的类别:")
+                                cat_top10_df = pd.DataFrame(cat_data[:10])
+                                cat_top10_df.columns = ["ID", "类别名称", "概率"]
+                                cat_top10_df["概率"] = cat_top10_df["概率"].apply(lambda x: f"{x*100:.2f}%")
+                                st.dataframe(cat_top10_df)
+                                
+                                # 显示所有类别的概率分布图
+                                st.markdown("##### 类别概率分布:")
+                                if len(cat_data) > 10:
+                                    fig_data = pd.DataFrame({
+                                        '类别': [d['name'].split(' ')[0] for d in cat_data[:10]] + ['其他'],
+                                        '概率': [d['probability'] for d in cat_data[:10]] + [sum(d['probability'] for d in cat_data[10:])]
+                                    })
+                                else:
+                                    fig_data = pd.DataFrame({
+                                        '类别': [d['name'].split(' ')[0] for d in cat_data],
+                                        '概率': [d['probability'] for d in cat_data]
+                                    })
+                                st.bar_chart(fig_data.set_index('类别'))
+                            
+                            # 显示属性预测结果
+                            st.markdown("**预测属性及概率:**")
+                            
+                            # 计算显示多少列
+                            num_columns = 3  # 默认3列显示
+                            
+                            # 根据阈值筛选属性（默认0.5，但这里显示所有）
+                            # st.slider可以让用户调整筛选阈值
+                            threshold = st.slider("属性置信度阈值", min_value=0.0, max_value=1.0, value=0.3, step=0.05)
+                            filtered_attrs = [attr for attr in attr_data if attr['probability'] >= threshold]
+                            
+                            if filtered_attrs:
+                                # 按概率分组显示属性
+                                # 高概率组 (>0.7)
+                                high_prob_attrs = [attr for attr in filtered_attrs if attr['probability'] > 0.7]
+                                if high_prob_attrs:
+                                    st.markdown("##### 高置信度属性 (>70%)")
+                                    rows = (len(high_prob_attrs) + num_columns - 1) // num_columns 
+                                    for r in range(rows):
+                                        cols_attr = st.columns(num_columns)
+                                        for c in range(num_columns):
+                                            idx = r * num_columns + c
+                                            if idx < len(high_prob_attrs):
+                                                attr = high_prob_attrs[idx]
+                                                with cols_attr[c]:
+                                                    st.success(f"{attr['name']} ({attr['probability']*100:.1f}%)")
+                                
+                                # 中概率组 (0.5-0.7)
+                                medium_prob_attrs = [attr for attr in filtered_attrs if 0.5 <= attr['probability'] <= 0.7]
+                                if medium_prob_attrs:
+                                    st.markdown("##### 中等置信度属性 (50%-70%)")
+                                    rows = (len(medium_prob_attrs) + num_columns - 1) // num_columns 
+                                    for r in range(rows):
+                                        cols_attr = st.columns(num_columns)
+                                        for c in range(num_columns):
+                                            idx = r * num_columns + c
+                                            if idx < len(medium_prob_attrs):
+                                                attr = medium_prob_attrs[idx]
+                                                with cols_attr[c]:
+                                                    st.info(f"{attr['name']} ({attr['probability']*100:.1f}%)")
+                                
+                                # 低概率组 (阈值-0.5)
+                                low_prob_attrs = [attr for attr in filtered_attrs if attr['probability'] < 0.5]
+                                if low_prob_attrs:
+                                    st.markdown("##### 低置信度属性 (<50%)")
+                                    rows = (len(low_prob_attrs) + num_columns - 1) // num_columns 
+                                    for r in range(rows):
+                                        cols_attr = st.columns(num_columns)
+                                        for c in range(num_columns):
+                                            idx = r * num_columns + c
+                                            if idx < len(low_prob_attrs):
+                                                attr = low_prob_attrs[idx]
+                                                with cols_attr[c]:
+                                                    st.warning(f"{attr['name']} ({attr['probability']*100:.1f}%)")
+                            else:
+                                st.write("在当前阈值下未检测到显著属性。")
+                            
+                            # 显示所有属性的表格视图（可折叠）
+                            with st.expander("查看所有属性概率详情"):
+                                attr_df = pd.DataFrame(attr_data)
+                                attr_df.columns = ["索引", "属性名称", "概率"]
+                                attr_df["概率"] = attr_df["概率"].apply(lambda x: f"{x*100:.1f}%")
+                                st.dataframe(attr_df)
 
-                    # 3. 模型推理
-                    with torch.no_grad():
-                        cat_logits, attr_logits = model(img_tensor)
+                        st.success("识别完成！")
 
-                    # 4. 解析结果
-                    # 类别
-                    pred_cat_id = torch.argmax(cat_logits, dim=1).item() + 1 
-                    en_cat_name = category_names_en.get(pred_cat_id, f"Unknown Category (ID: {pred_cat_id})")
-                    zh_cat_name = category_mapping.get(en_cat_name) # 从映射查找中文名
-                    display_cat_name = f"{zh_cat_name} ({en_cat_name})" if zh_cat_name else en_cat_name # 拼接显示
-
-                    # 属性 (使用 Sigmoid + 阈值)
-                    attr_probs = torch.sigmoid(attr_logits).squeeze(0) 
-                    threshold = 0.5 
-                    pred_attr_indices = torch.where(attr_probs > threshold)[0].tolist()
-                    pred_attr_names_display = []
-                    for idx in pred_attr_indices:
-                        en_attr_name = attribute_names_en.get(idx, f"Unknown Attr (Idx: {idx})")
-                        zh_attr_name = attribute_mapping.get(en_attr_name) # 尝试查找中文名
-                        display_attr_name = f"{zh_attr_name} ({en_attr_name})" if zh_attr_name else en_attr_name
-                        pred_attr_names_display.append(display_attr_name)
-
-                    # 5. 显示结果
-                    with col_results:
-                        st.subheader("识别结果:")
-                        st.markdown(f"**预测类别:** {display_cat_name}")
-                        st.markdown("**预测属性:**")
-                        if pred_attr_names_display:
-                            rows = (len(pred_attr_names_display) + 2) // 3 
-                            for r in range(rows):
-                                cols_attr = st.columns(3)
-                                for c in range(3):
-                                    idx = r * 3 + c
-                                    if idx < len(pred_attr_names_display):
-                                        with cols_attr[c]:
-                                            st.info(pred_attr_names_display[idx])
-                        else:
-                            st.write("未检测到显著属性。")
-
-                    st.success("识别完成！")
-
-                except Exception as e:
-                    st.error(f"识别过程中发生错误: {e}")
-                    st.error(traceback.format_exc()) # 显示详细错误 
+                    except Exception as e:
+                        st.error(f"识别过程中发生错误: {e}")
+                        
+                        st.error(traceback.format_exc()) # 显示详细错误 
