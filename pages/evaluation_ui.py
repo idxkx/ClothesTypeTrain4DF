@@ -128,7 +128,7 @@ all_results = load_results()
 # 筛选出成功的训练运行
 successful_runs = [
     r for r in all_results
-    if r.get("status") == "完成" and
+    if r.get("status") == "已完成" and
        r.get("functional_test_result") == "成功" and
        r.get("best_model_path") and
        os.path.exists(os.path.join(os.path.dirname(__file__), '..', r["best_model_path"])) # 检查文件是否存在
@@ -289,7 +289,7 @@ if st.button("🚀 开始识别！"):
         model_path = path_to_use
         backbone = backbone_to_use
         num_categories = 50 
-        num_attributes = 1000 
+        num_attributes = 26 
 
         # 加载类别和属性名称 (使用确定的 final_anno_dir)
         category_names_en = load_category_names(final_anno_dir)

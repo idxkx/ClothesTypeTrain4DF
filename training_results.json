@@ -54,5 +54,33 @@
         "end_time_str": "2025-04-20 09:22:10",
         "duration": 9047.673660993576,
         "duration_str": "2:30:47"
+    },
+    {
+        "start_time": 1745193252.3848577,
+        "start_time_str": "2025-04-21 07:54:12",
+        "model_name": "MD_RESNET18_5_64_50E4_clothes_model",
+        "strategy": "快速体验 (Fast Trial)",
+        "parameters": {
+            "epochs": 5,
+            "batch_size": 64,
+            "learning_rate": 0.0005,
+            "device": "cuda:0",
+            "model_save_path": ".\\models\\MD_RESNET18_5_64_50E4_clothes_model",
+            "attribute_loss_weight": 1.0,
+            "num_workers": 0
+        },
+        "backbone": "resnet18",
+        "status": "进行中",
+        "total_epochs": 5,
+        "completed_epochs": 5,
+        "best_val_loss": 1.6026297187805176,
+        "best_epoch": 3,
+        "best_model_path": ".\\models\\MD_RESNET18_5_64_50E4_clothes_model\\best_model_MD_RESNET18_5_64_50E4_clothes_model_epoch3.pth",
+        "diagnostic_summary": "### 🩺 训练诊断报告\n- **训练轮数:** 5 / 5\n- **最佳验证损失:** 1.6026 (出现在 Epoch 3)\n- **最终验证损失:** 1.8205\n- **最终验证准确率:** 61.55%\n- **收敛性:** ⚠️ 验证损失在最后5轮有所波动，但整体仍在下降。\n- **过拟合风险:** 高 (基于最终损失差异 1.08 和准确率差异 23.4%) \n  - _建议: 可尝试增加正则化、数据增强或提前停止。_",
+        "functional_test_result": "失败",
+        "end_time": 1745194654.9984066,
+        "end_time_str": "2025-04-21 08:17:34",
+        "duration": 1402.6135489940643,
+        "duration_str": "0:23:22"
     }
 ]

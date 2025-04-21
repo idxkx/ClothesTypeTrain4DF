@@ -234,7 +234,7 @@ def run_functional_test(model_save_dir, model_name, model_config, device):
         report.append(f"- 模型输出 (类别 Logits): {cat_logits.shape}")
         report.append(f"- 模型输出 (属性 Logits): {attr_logits.shape}")
         if cat_logits.shape[0] == 1 and cat_logits.shape[1] == model_config['num_categories'] and \
-           attr_logits.shape[0] == 1 and attr_logits.shape[1] == 1000: # 假设属性是1000个
+           attr_logits.shape[0] == 1 and attr_logits.shape[1] == 26: # 检查属性维度是26
              report.append("- ✅ 模拟推理成功，输出形状符合预期。")
              return "\n".join(report), True
         else:
@@ -980,6 +980,10 @@ if start_training:
             
         # --- Epoch 循环结束 --->
         training_successful = not training_interrupted # 如果没中断就算成功
+        
+        # 如果训练成功完成，更新状态为"已完成"
+        if training_successful:
+            current_run_result["status"] = "已完成"
         
     except Exception as e:
         error_msg = f"错误：训练过程中发生严重错误: {e}"

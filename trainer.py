@@ -31,7 +31,7 @@ except ImportError:
             attribute_label = torch.randint(0, 2, (self.num_attributes,)).float() 
             return {'image': torch.randn(3, 224, 224), 'category': category_label, 'attributes': attribute_label}
     class DummyModel(nn.Module):
-        def __init__(self, num_categories=50, num_attributes=1000, backbone='dummy', pretrained=False): # 添加参数以匹配 ClothesModel
+        def __init__(self, num_categories=50, num_attributes=26, backbone='dummy', pretrained=False): # 添加参数以匹配 ClothesModel
             super().__init__()
             # 简化模型以加快测试
             self.conv = nn.Conv2d(3, 16, 3, padding=1)
@@ -288,7 +288,7 @@ if __name__ == '__main__':
     from torch.utils.data import Dataset
     from torch.utils.data import Subset
     class DummyDataset(Dataset):
-        def __init__(self, length=100, num_categories=50, num_attributes=1000):
+        def __init__(self, length=100, num_categories=50, num_attributes=26):
             self.length = length
             self.num_categories = num_categories
             self.num_attributes = num_attributes
@@ -298,7 +298,7 @@ if __name__ == '__main__':
             attribute_label = torch.randint(0, 2, (self.num_attributes,)).float() 
             return {'image': torch.randn(3, 224, 224), 'category': category_label, 'attributes': attribute_label}
     class DummyModel(nn.Module):
-        def __init__(self, num_categories=50, num_attributes=1000, backbone='dummy', pretrained=False):
+        def __init__(self, num_categories=50, num_attributes=26, backbone='dummy', pretrained=False):
             super().__init__()
             self.conv = nn.Conv2d(3, 16, 3, padding=1)
             self.pool = nn.AdaptiveAvgPool2d((1, 1))
@@ -316,7 +316,7 @@ if __name__ == '__main__':
 
     print("[Trainer Test] 使用内部定义的 DummyDataset 和 DummyModel 进行测试。")
     num_categories = 50
-    num_attributes = 1000
+    num_attributes = 26
     
     # 明确使用 Dummy 数据集和模型
     test_model = DummyModel(num_categories=num_categories, num_attributes=num_attributes)
