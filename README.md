@@ -52,8 +52,8 @@ ClothesTypeDemo/
         source .venv/bin/activate 
         
         # 或者使用 conda
-        conda create -n clothes_demo python=3.10 # 指定 Python 版本
-        conda activate clothes_demo
+        conda create -n miaoda_clothes python=3.10 # 指定 Python 版本
+        conda activate miaoda_clothes
         ```
     *   **安装 PyTorch (重要):** 
         *   访问 [PyTorch 官网](https://pytorch.org/get-started/locally/) 获取适合你系统的 **稳定版本** 安装命令。
@@ -82,6 +82,16 @@ ClothesTypeDemo/
             ```
         *   **原因:** 这样可以方便地在代码中使用**相对路径**引用数据，避免像 `E:\AIModels\...` 这样的**硬编码绝对路径**。硬编码路径会导致项目在不同电脑或不同用户那里无法直接运行。
         *   代码实现时，应设计成可以配置数据路径的方式（例如通过配置文件或命令行参数），而不是写死路径。
+        *   **配置数据路径（重要！）：**
+            - 请在项目根目录下新建 `config.json` 文件，内容如下（请根据你的实际路径修改）：
+              ```json
+              {
+                "anno_dir": "/你的/Anno_fine/绝对路径",
+                "img_dir": "/你的/img_highres/绝对路径"
+              }
+              ```
+            - 代码会自动读取该配置文件，无需修改代码本身。
+            - 如果路径填写有误，程序会给出友好的报错提示。
     *   *提醒: `data/` 目录及其内容默认不会被提交到 Git 仓库 (已在 `.gitignore` 中配置)。*
 3.  **运行应用:** 
     *   确保你处于激活的虚拟环境中。

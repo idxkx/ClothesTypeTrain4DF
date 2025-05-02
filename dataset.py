@@ -9,6 +9,33 @@ from torchvision import transforms
 import logging
 import re
 from tqdm import tqdm
+import json
+import platform
+
+# 判断当前操作系统
+IS_WINDOWS = platform.system().lower().startswith('win')
+IS_LINUX = platform.system().lower() == 'linux'
+
+# 读取配置文件，获取标注文件和图片目录的绝对路径
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config.json')
+
+def safe_path(path):
+    """自动规范化路径，兼容Windows和Linux"""
+    return os.path.normpath(path)
+
+if not os.path.exists(CONFIG_PATH):
+    raise FileNotFoundError('未找到配置文件 config.json，请参考README.md在项目根目录下创建，并填写数据路径。')
+
+with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+    config = json.load(f)
+
+ANNO_DIR = safe_path(config.get('anno_dir', None))
+IMG_DIR = safe_path(config.get('img_dir', None))
+
+if not ANNO_DIR or not os.path.exists(ANNO_DIR):
+    raise FileNotFoundError(f'标注文件目录不存在或未配置，请检查 config.json 中的 "anno_dir" 路径: {ANNO_DIR} (当前系统: {'Windows' if IS_WINDOWS else 'Linux'})')
+if not IMG_DIR or not os.path.exists(IMG_DIR):
+    raise FileNotFoundError(f'高分辨率图片目录不存在或未配置，请检查 config.json 中的 "img_dir" 路径: {IMG_DIR} (当前系统: {'Windows' if IS_WINDOWS else 'Linux'})')
 
 # --- 配置日志记录 ---
 # 1. 配置基本日志记录器 (INFO 及以上级别，输出到控制台)
