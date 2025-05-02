@@ -23,6 +23,9 @@ nvidia-ml-py>=11.495.46
 matplotlib>=3.7.0
 plotly>=5.18.0
 
+# Async Support
+nest_asyncio>=1.5.8
+
 # Optional: Development Tools
 black  # Code formatting
 flake8  # Code linting

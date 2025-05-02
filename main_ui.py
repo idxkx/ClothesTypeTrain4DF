@@ -440,33 +440,45 @@ pretrained = True
 
 # --- 训练参数 ---
 st.sidebar.subheader("⏱️ 训练参数")
-# 为每个参数设置默认值，优先使用策略值，否则使用通用默认值或 session_state 中已有的值
-default_epochs = strategy_defaults.get('epochs', 10) if not is_manual_mode else st.session_state.get('epochs_input', 10)
-epochs = st.sidebar.number_input("训练轮次 (Epochs)", 
-                               min_value=1, max_value=100, 
-                               value=default_epochs, 
-                               key='epochs_input', # 添加 key
-                               help="模型完整学习一遍所有训练数据的次数。",
-                               on_change=None)
-
-default_batch_size = strategy_defaults.get('batch_size', 32) if not is_manual_mode else st.session_state.get('batch_size_input', 32)
-batch_size = st.sidebar.number_input("批次大小 (Batch Size)", 
-                                   min_value=1, max_value=256, 
-                                   value=default_batch_size, 
-                                   key='batch_size_input', # 添加 key
-                                   help="模型一次处理的图片数量。根据显存大小调整，越大通常越稳定，但更占显存。",
-                                   on_change=None)
-
-default_lr = strategy_defaults.get('learning_rate', 1e-4) if not is_manual_mode else st.session_state.get('learning_rate_input', 1e-4)
-learning_rate = st.sidebar.number_input(
-    "学习率 (Learning Rate)", 
-    min_value=1e-6, max_value=1e-2, 
-    value=default_lr, 
-    format="%.1e", 
-    key='learning_rate_input', # 添加 key
-    help="模型学习的速度。太大会导致不稳定，太小会训练过慢。通常从 1e-4 或 1e-3 开始尝试。",
-    on_change=None
+# 常用学习率选项
+lr_options = [
+    ("1e-2 (0.01)", 1e-2),
+    ("1e-3 (0.001)", 1e-3),
+    ("1e-4 (0.0001)", 1e-4),
+    ("5e-5 (0.00005)", 5e-5),
+    ("1e-5 (0.00001)", 1e-5),
+    ("自定义", "custom")
+]
+lr_labels = [x[0] for x in lr_options]
+lr_dict = dict(lr_options)
+# 默认值逻辑
+strategy_default_lr = strategy_defaults.get('learning_rate', 1e-4) if not is_manual_mode else st.session_state.get('learning_rate_input', 1e-4)
+def get_lr_label_by_value(val):
+    for label, v in lr_options:
+        if v != "custom" and abs(v - val) < 1e-10:
+            return label
+    return "自定义"
+# 选择学习率
+selected_lr_label = st.sidebar.selectbox(
+    "学习率 (Learning Rate)",
+    lr_labels,
+    index=lr_labels.index(get_lr_label_by_value(strategy_default_lr)),
+    key="learning_rate_selectbox",
+    help="模型学习的速度。太大会导致不稳定，太小会训练过慢。通常从 1e-4 或 1e-3 开始尝试。"
 )
+selected_lr_value = lr_dict[selected_lr_label]
+if selected_lr_value == "custom":
+    learning_rate = st.sidebar.number_input(
+        "自定义学习率", 
+        min_value=1e-6, max_value=1e-2, 
+        value=strategy_default_lr if get_lr_label_by_value(strategy_default_lr)=="自定义" else 1e-4, 
+        format="%.1e", 
+        key='learning_rate_input',
+        help="手动输入学习率。"
+    )
+else:
+    learning_rate = selected_lr_value
+    st.session_state["learning_rate_input"] = learning_rate
 
 default_attr_weight = strategy_defaults.get('attribute_loss_weight', 1.0) if not is_manual_mode else st.session_state.get('attribute_loss_weight_input', 1.0)
 attribute_loss_weight = st.sidebar.slider(
