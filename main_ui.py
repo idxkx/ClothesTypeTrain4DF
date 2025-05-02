@@ -9,8 +9,17 @@ import math
 import traceback
 from torchvision import transforms # 确保导入 transforms
 from datetime import datetime, timedelta 
-# --- 新增：导入 json --- 
 import json 
+import asyncio
+import nest_asyncio
+
+# 处理事件循环
+try:
+    loop = asyncio.get_event_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+nest_asyncio.apply()
 
 # --- GPU 监控依赖 ---
 nvml_available = False
@@ -199,9 +208,11 @@ def generate_diagnostic_report(history_df, best_val_loss, total_epochs):
 
 # --- 新增：功能模拟测试函数 ---
 def run_functional_test(model_save_dir, model_name, model_config, device):
-    """尝试加载最佳模型并进行一次模拟推理"""
+    """尝试加载最佳模型并进行一次模拟推理，同时检查元数据文件"""
     report = ["### ⚙️ 功能模拟测试"] 
     best_model_file = None
+    metadata_file = None
+    
     try:
         # 查找最佳模型文件
         possible_files = [f for f in os.listdir(model_save_dir) if f.startswith(f"best_model_{model_name}") and f.endswith(".pth")]
@@ -212,6 +223,27 @@ def run_functional_test(model_save_dir, model_name, model_config, device):
         possible_files.sort(key=lambda x: int(x.split('_epoch')[-1].split('.')[0]), reverse=True)
         best_model_file = os.path.join(model_save_dir, possible_files[0])
         report.append(f"- 找到最佳模型文件: `{best_model_file}`")
+        
+        # 查找元数据文件
+        metadata_file = os.path.join(model_save_dir, f"{model_name}_metadata.json")
+        if os.path.exists(metadata_file):
+            report.append(f"- ✅ 找到元数据文件: `{metadata_file}`")
+            # 读取并显示基本元数据信息
+            try:
+                with open(metadata_file, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+                report.append("- 元数据概要:")
+                report.append(f"  - 模型名称: {metadata.get('model_name', '未定义')}")
+                report.append(f"  - 版本: {metadata.get('version', '未定义')}")
+                report.append(f"  - 架构: {metadata.get('architecture', '未定义')}")
+                report.append(f"  - 输入形状: {metadata.get('input_shape', '未定义')}")
+                report.append(f"  - 支持类别数: {len(metadata.get('class_names', []))} 类")
+                report.append(f"  - 支持特征数: {len(metadata.get('feature_names', []))} 项")
+                report.append(f"  - 创建日期: {metadata.get('date_created', '未定义')}")
+            except Exception as e:
+                report.append(f"- ⚠️ 读取元数据文件出错: {e}")
+        else:
+            report.append("- ⚠️ 未找到元数据文件，这可能会影响模型的可用性。")
 
         # 加载模型
         report.append("- 尝试加载模型...")
@@ -236,7 +268,13 @@ def run_functional_test(model_save_dir, model_name, model_config, device):
         if cat_logits.shape[0] == 1 and cat_logits.shape[1] == model_config['num_categories'] and \
            attr_logits.shape[0] == 1 and attr_logits.shape[1] == 26: # 检查属性维度是26
              report.append("- ✅ 模拟推理成功，输出形状符合预期。")
-             return "\n".join(report), True
+             
+             # 检查是否有元数据和模型，全部成功才返回成功
+             if os.path.exists(metadata_file):
+                 return "\n".join(report), True
+             else:
+                 report.append("- ⚠️ 功能测试部分成功，但缺少元数据文件。")
+                 return "\n".join(report), False
         else:
              report.append("- ❌ 模拟推理完成，但输出形状不符合预期！")
              return "\n".join(report), False
@@ -268,6 +306,28 @@ def save_results(results):
     except IOError as e:
         st.error(f"无法保存训练结果到 {RESULTS_FILE}: {e}")
 # ------------------------------>
+
+# --- 新增：根据参数自动生成模型名称 --- 
+def generate_model_name(backbone, epochs, batch_size, learning_rate):
+    """根据训练参数自动生成模型名称，格式为MD_骨干网络_训练轮次_批次大小_学习率"""
+    # 处理学习率字符串，如1e-4变为10E4, 5e-5变为50E5
+    lr_str = f"{learning_rate:.1e}"  # 例如：5.0e-05
+    
+    # 解析科学计数法
+    parts = lr_str.split('e')
+    base = parts[0].replace('.', '')  # 5.0 -> 50
+    exp = parts[1]  # -05
+    
+    if len(base) == 1:
+        base = f"{base}0"  # 例如：5 -> 50
+        
+    # 将1e-4转换为10E4的格式
+    lr_formatted = f"{base}E{exp[1:]}".upper()  # 50E5
+    
+    # 处理backbone名称，转为大写
+    backbone_upper = backbone.upper()
+    
+    return f"MD_{backbone_upper}_{epochs}_{batch_size}_{lr_formatted}"
 
 # --- 策略定义 ---
 STRATEGIES = {
@@ -301,8 +361,6 @@ st.sidebar.header("⚙️ 训练控制中心")
 
 # --- 新增：timm 安装提示 --- 
 st.sidebar.info("提示：部分骨干网络依赖 `timm` 库。若选择新网络无效，请尝试运行 `pip install timm` 安装。")
-
-model_name = st.sidebar.text_input("为你的模型起个名字", "my_clothes_model")
 
 # --- 数据集设置 ---
 st.sidebar.subheader("💾 数据集路径")
@@ -388,14 +446,16 @@ epochs = st.sidebar.number_input("训练轮次 (Epochs)",
                                min_value=1, max_value=100, 
                                value=default_epochs, 
                                key='epochs_input', # 添加 key
-                               help="模型完整学习一遍所有训练数据的次数。")
+                               help="模型完整学习一遍所有训练数据的次数。",
+                               on_change=None)
 
 default_batch_size = strategy_defaults.get('batch_size', 32) if not is_manual_mode else st.session_state.get('batch_size_input', 32)
 batch_size = st.sidebar.number_input("批次大小 (Batch Size)", 
                                    min_value=1, max_value=256, 
                                    value=default_batch_size, 
                                    key='batch_size_input', # 添加 key
-                                   help="模型一次处理的图片数量。根据显存大小调整，越大通常越稳定，但更占显存。")
+                                   help="模型一次处理的图片数量。根据显存大小调整，越大通常越稳定，但更占显存。",
+                                   on_change=None)
 
 default_lr = strategy_defaults.get('learning_rate', 1e-4) if not is_manual_mode else st.session_state.get('learning_rate_input', 1e-4)
 learning_rate = st.sidebar.number_input(
@@ -404,7 +464,8 @@ learning_rate = st.sidebar.number_input(
     value=default_lr, 
     format="%.1e", 
     key='learning_rate_input', # 添加 key
-    help="模型学习的速度。太大会导致不稳定，太小会训练过慢。通常从 1e-4 或 1e-3 开始尝试。"
+    help="模型学习的速度。太大会导致不稳定，太小会训练过慢。通常从 1e-4 或 1e-3 开始尝试。",
+    on_change=None
 )
 
 default_attr_weight = strategy_defaults.get('attribute_loss_weight', 1.0) if not is_manual_mode else st.session_state.get('attribute_loss_weight_input', 1.0)
@@ -414,8 +475,31 @@ attribute_loss_weight = st.sidebar.slider(
     value=default_attr_weight, 
     step=0.1, 
     key='attribute_loss_weight_input', # 添加 key
-    help="调整类别任务和属性任务的重要性。增加此值会让模型更关注属性识别。"
+    help="调整类别任务和属性任务的重要性。增加此值会让模型更关注属性识别。",
+    on_change=None
 )
+
+# 根据当前参数生成模型名称
+def get_current_model_name():
+    return generate_model_name(backbone, epochs, batch_size, learning_rate)
+
+# 当用户首次加载页面或改变策略时，更新模型名称
+if 'last_params' not in st.session_state:
+    st.session_state.last_params = (backbone, epochs, batch_size, learning_rate)
+    
+# 检查参数是否变化
+current_params = (backbone, epochs, batch_size, learning_rate)
+params_changed = current_params != st.session_state.last_params
+
+# 如果参数改变，更新模型名称
+if params_changed:
+    st.session_state.last_params = current_params
+    st.session_state.model_name = get_current_model_name()
+elif 'model_name' not in st.session_state:
+    st.session_state.model_name = get_current_model_name()
+
+# 显示模型名称输入框，默认使用自动生成的名称
+model_name = st.sidebar.text_input("为你的模型起个名字", st.session_state.model_name)
 
 # --- 设备与执行 ---
 st.sidebar.subheader("💻 运行设备")
@@ -552,6 +636,17 @@ def display_history():
     display_data = []
     for r in reversed(all_results): # 显示最新的在前面
         best_epoch_info = f"{r.get('best_val_loss', 'N/A'):.4f} @ E{r.get('best_epoch', 'N/A')}" if isinstance(r.get('best_val_loss'), (int, float)) else "N/A"
+        
+        # 检查是否存在元数据文件
+        metadata_status = "⚠️ 未找到"
+        model_path = r.get("best_model_path", "")
+        if model_path and os.path.exists(model_path):
+            model_dir = os.path.dirname(model_path)
+            model_name = r.get("model_name", "")
+            metadata_file = os.path.join(model_dir, f"{model_name}_metadata.json")
+            if os.path.exists(metadata_file):
+                metadata_status = "✅ 已生成"
+        
         display_data.append({
             "完成时间": r.get("end_time_str", "N/A"),
             "模型名称": r.get("model_name", "N/A"),
@@ -562,7 +657,7 @@ def display_history():
             # "最佳验证准确率": f"{r.get('best_val_acc', 'N/A'):.2f}%" if isinstance(r.get('best_val_acc'), (int, float)) else "N/A", # 暂时省略准确率
             "状态": r.get("status", "N/A").split('.')[0], # 取第一句
             "总耗时": r.get("duration_str", "N/A"),
-            "模型路径": r.get("best_model_path", "N/A"),
+            "元数据": metadata_status,
             "功能测试": r.get("functional_test_result", "未执行"),
         })
 
@@ -571,6 +666,163 @@ def display_history():
 
 # 在应用加载时就显示历史记录
 display_history()
+
+# 添加元数据查看功能
+with st.expander("🔍 查看模型元数据", expanded=False):
+    history_desc = """
+    此区域可以查看已训练模型的元数据文件，包含模型架构、类别名称、特征名称等信息。
+    """
+    st.markdown(history_desc)
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        selected_model = st.selectbox(
+            "选择要查看元数据的模型",
+            options=[r.get("model_name", "未命名模型") for r in load_results()],
+            index=0 if load_results() else None,
+            help="选择一个模型来查看其元数据内容"
+        )
+    
+    with col2:
+        if st.button("查看元数据", key="view_metadata_btn"):
+            if selected_model:
+                # 查找选定模型的记录
+                model_results = [r for r in load_results() if r.get("model_name") == selected_model]
+                if model_results:
+                    model_result = model_results[0]
+                    model_path = model_result.get("best_model_path", "")
+                    if model_path and os.path.exists(model_path):
+                        model_dir = os.path.dirname(model_path)
+                        metadata_file = os.path.join(model_dir, f"{selected_model}_metadata.json")
+                        if os.path.exists(metadata_file):
+                            try:
+                                with open(metadata_file, 'r', encoding='utf-8') as f:
+                                    metadata = json.load(f)
+                                st.json(metadata)
+                                st.success(f"✅ 已成功加载 {selected_model} 的元数据")
+                            except Exception as e:
+                                st.error(f"读取元数据时发生错误: {e}")
+                        else:
+                            st.warning(f"⚠️ 未找到 {selected_model} 的元数据文件 ({metadata_file})")
+                    else:
+                        st.warning(f"⚠️ 找不到 {selected_model} 的模型文件")
+                else:
+                    st.warning(f"⚠️ 找不到 {selected_model} 的训练记录")
+            else:
+                st.info("请先选择一个模型")
+
+# 添加手动创建元数据的功能
+with st.expander("🛠️ 手动创建元数据", expanded=False):
+    st.markdown("""
+    此功能允许为已训练的模型手动创建元数据文件，适用于元数据丢失或未自动生成的情况。
+    """)
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        metadata_model = st.selectbox(
+            "选择要创建元数据的模型",
+            options=[r.get("model_name", "未命名模型") for r in load_results()],
+            index=0 if load_results() else None,
+            help="选择一个模型来创建或重新生成其元数据文件"
+        )
+    
+    # 创建元数据所需的参数输入
+    if metadata_model:
+        model_results = [r for r in load_results() if r.get("model_name") == metadata_model]
+        if model_results:
+            model_result = model_results[0]
+            backbone = model_result.get("backbone", "unknown")
+            
+            st.subheader("基本信息")
+            version = st.text_input("版本", "1.0.0")
+            description = st.text_input("描述", f"基于{backbone}的服装分类模型")
+            trained_by = st.text_input("训练者", "服装类别与属性识别训练平台")
+            date_created = st.date_input("创建日期", datetime.now()).strftime("%Y-%m-%d")
+            
+            st.subheader("模型配置")
+            st.markdown(f"架构: **{backbone}**")
+            input_shape = st.text_input("输入形状 (逗号分隔，如3,224,224)", "3,224,224")
+            
+            st.subheader("类别与特征")
+            st.markdown("### 类别名称")
+            st.markdown("每行输入一个类别名称，如为空将使用默认名称")
+            default_class_names = (
+                "T恤\n衬衫\n卫衣\n毛衣\n西装\n夹克\n羽绒服\n风衣\n"
+                "牛仔裤\n休闲裤\n西裤\n短裤\n运动裤\n连衣裙\n半身裙\n"
+                "旗袍\n礼服\n运动鞋\n皮鞋\n高跟鞋\n靴子\n凉鞋\n拖鞋\n"
+                "帽子\n围巾\n领带\n手套\n袜子\n腰带\n眼镜\n手表\n"
+                "项链\n手链\n耳环\n戒指\n包包\n背包\n手提包\n钱包\n行李箱"
+            )
+            class_names_text = st.text_area("类别名称列表", default_class_names, height=200)
+            
+            st.markdown("### 特征名称")
+            st.markdown("每行输入一个特征名称，如为空将使用默认名称")
+            default_feature_names = (
+                "颜色\n材质\n样式\n花纹\n季节\n正式度\n领型\n袖长\n"
+                "长度\n裤型\n鞋型\n高度\n闭合方式"
+            )
+            feature_names_text = st.text_area("特征名称列表", default_feature_names, height=150)
+            
+            def create_metadata_file():
+                """尝试创建元数据文件"""
+                try:
+                    # 解析输入形状
+                    try:
+                        shape_values = [int(x.strip()) for x in input_shape.split(",")]
+                        if len(shape_values) != 3:
+                            return False, "输入形状必须是三个数字 (通道数,高度,宽度)"
+                    except ValueError:
+                        return False, "输入形状必须是逗号分隔的数字"
+                    
+                    # 解析类别名称和特征名称
+                    class_names = [name.strip() for name in class_names_text.splitlines() if name.strip()]
+                    feature_names = [name.strip() for name in feature_names_text.splitlines() if name.strip()]
+                    
+                    # 构建元数据
+                    metadata = {
+                        "model_name": metadata_model,
+                        "version": version,
+                        "description": description,
+                        "input_shape": shape_values,
+                        "architecture": backbone,
+                        "class_names": class_names,
+                        "feature_names": feature_names,
+                        "date_created": date_created,
+                        "framework": "PyTorch",
+                        "trained_by": trained_by
+                    }
+                    
+                    # 保存元数据文件
+                    model_path = model_result.get("best_model_path", "")
+                    if not model_path or not os.path.exists(model_path):
+                        return False, f"找不到模型文件: {model_path}"
+                    
+                    model_dir = os.path.dirname(model_path)
+                    metadata_file = os.path.join(model_dir, f"{metadata_model}_metadata.json")
+                    
+                    with open(metadata_file, 'w', encoding='utf-8') as f:
+                        json.dump(metadata, f, ensure_ascii=False, indent=4)
+                    
+                    return True, f"元数据文件已成功创建: {metadata_file}"
+                
+                except Exception as e:
+                    return False, f"创建元数据文件时出错: {e}"
+            
+            if st.button("创建元数据文件", key="create_metadata_btn"):
+                success, message = create_metadata_file()
+                if success:
+                    st.success(message)
+                else:
+                    st.error(message)
+                
+                # 刷新历史记录显示
+                display_history()
+        else:
+            st.warning(f"找不到模型 {metadata_model} 的训练记录")
+    else:
+        st.info("请先选择一个模型")
 # --- 历史记录对比区域结束 ---
 
 # --- 训练逻辑触发 ---

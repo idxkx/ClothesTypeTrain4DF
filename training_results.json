@@ -110,5 +110,34 @@
         "end_time_str": "2025-04-21 10:09:32",
         "duration": 4371.057090997696,
         "duration_str": "1:12:51"
+    },
+    {
+        "start_time": 1746158374.0831435,
+        "start_time_str": "2025-05-02 11:59:34",
+        "model_name": "MD_EFFICENTNET_30_32_50E5",
+        "strategy": "最高精度 (High Accuracy)",
+        "parameters": {
+            "epochs": 30,
+            "batch_size": 32,
+            "learning_rate": 5e-05,
+            "device": "cuda:0",
+            "model_save_path": ".\\models\\MD_EFFICENTNET_30_32_50E5",
+            "attribute_loss_weight": 1.0,
+            "num_workers": 0
+        },
+        "backbone": "efficientnet_b4",
+        "anno_dir": "E:\\AIModels\\DeepFashion\\DeepFashion\\Category and Attribute Prediction Benchmark\\Anno_fine",
+        "status": "已完成",
+        "total_epochs": 30,
+        "completed_epochs": 30,
+        "best_val_loss": 1.587270230293274,
+        "best_epoch": 4,
+        "best_model_path": ".\\models\\MD_EFFICENTNET_30_32_50E5\\best_model_MD_EFFICENTNET_30_32_50E5_epoch4.pth",
+        "diagnostic_summary": "### 🩺 训练诊断报告\n- **训练轮数:** 30 / 30\n- **最佳验证损失:** 1.5873 (出现在 Epoch 4)\n- **最终验证损失:** 2.8331\n- **最终验证准确率:** 60.75%\n- **收敛性:** ❌ 验证损失在最后5轮未能持续下降，可能已收敛或遇到瓶颈。\n- **过拟合风险:** 高 (基于最终损失差异 2.68 和准确率差异 38.7%) \n  - _建议: 可尝试增加正则化、数据增强或提前停止。_",
+        "functional_test_result": "成功",
+        "end_time": 1746168051.6309664,
+        "end_time_str": "2025-05-02 14:40:51",
+        "duration": 9677.54782295227,
+        "duration_str": "2:41:17"
     }
 ]

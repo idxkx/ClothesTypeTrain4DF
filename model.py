@@ -24,6 +24,11 @@ class ClothesModel(nn.Module):
         print(f"[Model]   骨干网络: {backbone} (使用 timm 加载默认预训练权重)")
         print(f"[Model]   类别数量: {num_categories}")
         print(f"[Model]   属性数量: {num_attributes}") 
+        
+        # 存储backbone名称，用于元数据生成
+        self.backbone_name = backbone
+        self.num_categories = num_categories
+        self.num_attributes = num_attributes
 
         # --- 1. 使用 timm 加载骨干网络 --- 
         try:

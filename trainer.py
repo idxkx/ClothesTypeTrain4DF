@@ -7,6 +7,8 @@ from torch.utils.data import DataLoader
 import time
 import os
 import math
+import json
+from datetime import datetime
 
 # 导入我们之前定义的类
 # 假设 dataset.py 和 model.py 在同一个目录下
@@ -103,6 +105,10 @@ class Trainer:
             num_workers=num_workers, pin_memory=pin_memory
         )
         print(f"[Trainer] DataLoader 初始化完成. 批次: {batch_size}, workers: {num_workers}")
+
+        # 存储数据集，用于元数据生成
+        self.train_dataset = train_dataset
+        self.val_dataset = val_dataset
 
         # 损失函数
         self.criterion_category = nn.CrossEntropyLoss(ignore_index=-1)
@@ -238,6 +244,105 @@ class Trainer:
         print(f"--- Epoch {epoch_num+1} 验证完成 ---")
         return epoch_loss, epoch_cat_accuracy
 
+    def _save_metadata(self, model_name):
+        """生成并保存模型元数据文件"""
+        print(f"[Trainer] 生成模型元数据...")
+        
+        try:
+            # 获取模型相关信息
+            if isinstance(self.model, ClothesModel):
+                backbone = getattr(self.model, 'backbone_name', 
+                                  self.args.get('backbone', 'unknown_backbone'))
+            else:
+                backbone = "unknown_backbone"
+            
+            # 尝试获取类别和属性名称
+            class_names = []
+            feature_names = []
+            
+            # 从数据集中获取类别和属性名称
+            try:
+                # 尝试从train_dataset读取类别和属性名称
+                if hasattr(self.train_dataset, 'category_names') and self.train_dataset.category_names:
+                    # 类别名称通常是字典 {id: name}，需要转换为列表
+                    category_dict = self.train_dataset.category_names
+                    # 因为ID可能从1开始，我们需要确保列表索引正确
+                    max_id = max(category_dict.keys()) if category_dict else 0
+                    class_names = ["未知"] * max_id
+                    for cat_id, cat_name in category_dict.items():
+                        if 1 <= cat_id <= max_id:  # 确保ID在有效范围内
+                            class_names[cat_id-1] = cat_name  # 调整为0-based索引
+                
+                if hasattr(self.train_dataset, 'attribute_names') and self.train_dataset.attribute_names:
+                    # 属性名称也是字典，同样转换为列表
+                    attribute_dict = self.train_dataset.attribute_names
+                    max_id = max(attribute_dict.keys()) if attribute_dict else 0
+                    feature_names = ["未知"] * max_id
+                    for attr_id, attr_name in attribute_dict.items():
+                        if 1 <= attr_id <= max_id:
+                            feature_names[attr_id-1] = attr_name
+            except Exception as e:
+                print(f"[Trainer] 警告：从数据集获取类别/属性名称时出错: {e}")
+                # 出错时使用空列表
+                class_names = []
+                feature_names = []
+            
+            # 尝试从name_mapping.json加载中文名称映射
+            try:
+                if os.path.exists('name_mapping.json'):
+                    with open('name_mapping.json', 'r', encoding='utf-8') as f:
+                        name_mapping = json.load(f)
+                    
+                    # 如果有映射且class_names非空，尝试应用映射
+                    if 'categories' in name_mapping and class_names:
+                        for i, en_name in enumerate(class_names):
+                            if en_name in name_mapping['categories']:
+                                class_names[i] = name_mapping['categories'][en_name]
+                    
+                    # 对属性名称也进行同样操作
+                    if 'attributes' in name_mapping and feature_names:
+                        for i, en_name in enumerate(feature_names):
+                            if en_name in name_mapping['attributes']:
+                                feature_names[i] = name_mapping['attributes'][en_name]
+            except Exception as e:
+                print(f"[Trainer] 警告：应用中文名称映射时出错: {e}")
+            
+            # 输入形状采用标准尺寸，如果使用了其他尺寸，应从配置获取
+            input_shape = [3, 224, 224]  # 默认值
+            
+            # 当前时间作为模型创建日期
+            date_created = datetime.now().strftime("%Y-%m-%d")
+            
+            # 获取特征数量
+            num_categories = len(class_names)
+            
+            # 构建元数据 (使用英文key)
+            metadata = {
+                "model_name": model_name,
+                "version": "1.0.0",  # 可根据实际情况调整
+                "description": f"基于{backbone}的服装分类模型，支持{num_categories}类服装分类",
+                "input_shape": input_shape,
+                "architecture": backbone,
+                "class_names": class_names,
+                "feature_names": feature_names,
+                "date_created": date_created,
+                "framework": "PyTorch",
+                "trained_by": "服装类别与属性识别训练平台"
+            }
+            
+            # 保存元数据文件
+            metadata_path = os.path.join(self.model_save_path, f"{model_name}_metadata.json")
+            with open(metadata_path, 'w', encoding='utf-8') as f:
+                json.dump(metadata, f, ensure_ascii=False, indent=4)
+            
+            print(f"[Trainer] 元数据文件已保存至: {metadata_path}")
+            return metadata_path
+        
+        except Exception as e:
+            print(f"[Trainer] 错误：生成元数据文件时出错: {e}")
+            # 出错时返回None
+            return None
+
     def train(self):
         """执行完整的训练流程"""
         print("\n==================== 开始训练 ====================")
@@ -253,107 +358,86 @@ class Trainer:
             self.history['train_cat_acc'].append(train_cat_acc)
             self.history['val_cat_acc'].append(val_cat_acc)
 
-            print(f"\nEpoch {epoch+1}/{self.epochs} 结果:")
-            print(f"  训练 - Loss: {train_loss:.4f}, Cat Acc: {train_cat_acc:.2f}%")
-            print(f"  验证 - Loss: {val_loss:.4f}, Cat Acc: {val_cat_acc:.2f}%")
-            # TODO: UI 更新点: 发送 epoch 结果
+            # 计算训练时间
+            epoch_time = time.time() - start_train_time
+            avg_time_per_epoch = epoch_time / (epoch + 1)
+            remaining_epochs = self.epochs - (epoch + 1)
+            estimated_remaining_time = avg_time_per_epoch * remaining_epochs
 
-            # 保存最佳模型 (基于验证损失)
-            if val_loss < self.best_val_loss:
-                self.best_val_loss = val_loss
-                if self.model_save_path:
-                    save_filename = os.path.join(self.model_save_path, f"best_model_epoch_{epoch+1}.pth")
+            # 打印本轮结果
+            print("\n--- 训练摘要 ---")
+            print(f"Epoch {epoch+1}/{self.epochs} - 耗时: {epoch_time:.2f}s (估计剩余: {estimated_remaining_time:.2f}s)")
+            print(f"  训练损失: {train_loss:.4f}, 类别准确率: {train_cat_acc:.2f}%")
+            print(f"  验证损失: {val_loss:.4f}, 类别准确率: {val_cat_acc:.2f}%")
+
+            # 保存最佳模型
+            if self.model_save_path:
+                # 始终保存最新的模型
+                latest_model_file = os.path.join(self.model_save_path, f"latest_model_epoch{epoch+1}.pth")
+                try:
+                    torch.save(self.model.state_dict(), latest_model_file)
+                    print(f"最新模型已保存: {latest_model_file}")
+                except Exception as e:
+                    print(f"错误：保存最新模型时出错: {e}")
+
+                # 保存性能最佳的模型
+                if val_loss < self.best_val_loss:
+                    self.best_val_loss = val_loss
+                    best_model_file = os.path.join(self.model_save_path, f"best_model_epoch{epoch+1}.pth")
                     try:
-                        torch.save(self.model.state_dict(), save_filename)
-                        print(f"  ** 新的最佳模型已保存到: {save_filename} (Val Loss: {val_loss:.4f}) **")
+                        torch.save(self.model.state_dict(), best_model_file)
+                        print(f"新的最佳模型已保存: {best_model_file} (验证损失: {val_loss:.4f})")
+                        
+                        # 为最佳模型生成metadata.json文件
+                        model_name = os.path.basename(self.model_save_path)
+                        self._save_metadata(model_name)
                     except Exception as e:
-                        print(f"错误：保存模型时出错: {e}")
-                else:
-                     print("  (模型保存路径未设置，跳过保存最佳模型)")
-            
-            # TODO: 实现提前停止逻辑 (Early Stopping)
+                        print(f"错误：保存最佳模型时出错: {e}")
 
-        total_train_time = time.time() - start_train_time
+        # 训练完成
+        total_time = time.time() - start_train_time
         print("\n==================== 训练完成 ====================")
-        print(f"总训练时间: {total_train_time:.2f} 秒")
+        print(f"训练时间总计: {total_time:.2f}秒 ({total_time/60:.2f}分钟)")
         print(f"最佳验证损失: {self.best_val_loss:.4f}")
-        return self.history # 返回训练历史记录
+        
+        # 返回训练历史和最佳验证损失
+        return self.history, self.best_val_loss
 
-# --- 示例用法 (用于基本测试) ---
-if __name__ == '__main__':
-    print("[Trainer Test] 开始测试 Trainer 类...")
-
-    # --- 定义用于测试的虚拟数据和模型 ---
-    # (这些定义现在放在测试块内部，确保总是使用它们进行测试)
-    from torch.utils.data import Dataset
-    from torch.utils.data import Subset
-    class DummyDataset(Dataset):
-        def __init__(self, length=100, num_categories=50, num_attributes=26):
-            self.length = length
-            self.num_categories = num_categories
-            self.num_attributes = num_attributes
-        def __len__(self): return self.length
-        def __getitem__(self, idx):
-            category_label = torch.randint(0, self.num_categories, (1,)).squeeze()
-            attribute_label = torch.randint(0, 2, (self.num_attributes,)).float() 
-            return {'image': torch.randn(3, 224, 224), 'category': category_label, 'attributes': attribute_label}
-    class DummyModel(nn.Module):
-        def __init__(self, num_categories=50, num_attributes=26, backbone='dummy', pretrained=False):
-            super().__init__()
-            self.conv = nn.Conv2d(3, 16, 3, padding=1)
-            self.pool = nn.AdaptiveAvgPool2d((1, 1))
-            self.flatten = nn.Flatten()
-            num_ftrs = 16 
-            self.category_head = nn.Linear(num_ftrs, num_categories)
-            self.attribute_head = nn.Linear(num_ftrs, num_attributes)
-        def forward(self, x):
-            x = self.pool(torch.relu(self.conv(x)))
-            x = self.flatten(x)
-            cat_logits = self.category_head(x)
-            attr_logits = self.attribute_head(x)
-            return cat_logits, attr_logits
-    # --- 虚拟数据和模型定义结束 ---
-
-    print("[Trainer Test] 使用内部定义的 DummyDataset 和 DummyModel 进行测试。")
-    num_categories = 50
-    num_attributes = 26
+# --- 仅用于测试 ---
+if __name__ == "__main__":
+    print("\n--- 测试 Trainer 类 (使用模拟数据) ---")
     
-    # 明确使用 Dummy 数据集和模型
-    test_model = DummyModel(num_categories=num_categories, num_attributes=num_attributes)
-    test_train_ds = DummyDataset(length=128, num_categories=num_categories, num_attributes=num_attributes)
-    test_val_ds = DummyDataset(length=64, num_categories=num_categories, num_attributes=num_attributes)
-
-    # 定义测试参数
-    test_args = {
-        'epochs': 2, 
-        'batch_size': 16,
+    # 创建简单模型和数据集用于测试
+    model = DummyModel(num_categories=10, num_attributes=5)
+    train_ds = DummyDataset(length=32, num_categories=10, num_attributes=5)
+    val_ds = DummyDataset(length=16, num_categories=10, num_attributes=5)
+    
+    # 测试参数
+    args = {
+        'epochs': 2,
+        'batch_size': 8,
         'learning_rate': 1e-3,
-        'device': 'cpu', # 强制 CPU 测试
-        'model_save_path': './test_models', 
-        'attribute_loss_weight': 0.5,
-        'num_workers': 0
+        'model_save_path': './test_models',
+        'attribute_loss_weight': 0.5
     }
-
-    print(f"[Trainer Test] 测试参数: {test_args}")
-
-    # 创建 Trainer 实例并开始训练
+    
+    # 初始化 Trainer
     try:
-        trainer = Trainer(test_model, test_train_ds, test_val_ds, test_args)
-        print("[Trainer Test] Trainer 初始化成功。")
-        history = trainer.train()
-        print("[Trainer Test] 训练过程完成。")
-        print("[Trainer Test] 训练历史记录:")
-        print(history)
+        trainer = Trainer(model, train_ds, val_ds, args)
         
-        # ... (省略后续检查代码) ...
-        assert len(history['train_loss']) == test_args['epochs']
-        # ... (省略其他检查) ...
-        print("[Trainer Test] 历史记录长度检查通过。")
-        # ... (省略模型文件检查) ...
+        # 执行训练
+        history, best_val_loss = trainer.train()
         
+        print("\n--- 训练历史摘要 ---")
+        for epoch in range(len(history['train_loss'])):
+            print(f"Epoch {epoch+1}: Train Loss={history['train_loss'][epoch]:.4f}, "
+                  f"Val Loss={history['val_loss'][epoch]:.4f}, "
+                  f"Train Cat Acc={history['train_cat_acc'][epoch]:.2f}%, "
+                  f"Val Cat Acc={history['val_cat_acc'][epoch]:.2f}%")
+    
     except Exception as e:
-        print(f"[Trainer Test] Trainer 测试过程中发生严重错误: {e}")
         import traceback
-        traceback.print_exc()
-
-    print("[Trainer Test] 测试结束。") 
+        print(f"测试失败: {e}")
+        print(traceback.format_exc())
+    
+    print("\n--- 测试完成 ---") 
