@@ -1,12 +1,15 @@
 # Placeholder for Streamlit UI code 
 
-# 忽略PyTorch和Streamlit之间的特定警告
+# 解决PyTorch和Streamlit之间的兼容性问题
 import warnings
-warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*Tried to instantiate class \"__path__._path\".*")
-warnings.filterwarnings("ignore", message=".*torch.classes.__path__.*")
-
 import sys
 import os
+
+# 忽略PyTorch相关警告和错误
+warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*Tried to instantiate class \"__path__._path\".*")
+warnings.filterwarnings("ignore", message=".*torch.classes.__path__.*")
+warnings.filterwarnings("ignore", message=".*torch._C.*")
+warnings.filterwarnings("ignore", message=".*no running event loop.*")
 
 # 添加当前目录到Python模块搜索路径中
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -18,14 +21,14 @@ import asyncio
 import nest_asyncio
 
 # 应用nest_asyncio以允许嵌套事件循环
-nest_asyncio.apply()
-
-# 确保存在事件循环
 try:
+    nest_asyncio.apply()
     loop = asyncio.get_event_loop()
 except RuntimeError:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+
+# 导入框架和库
 import streamlit as st
 import torch
 import time
@@ -74,15 +77,72 @@ except ImportError as e:
     st.error(f"错误：无法导入必要的模块。请确保 model.py, trainer.py, dataset.py 与 main_ui.py 在同一目录下。错误: {e}")
     st.stop()
 
+# 修复torch.classes.__path__问题
+if hasattr(torch, 'classes'):
+    # 定义补丁类
+    if not hasattr(sys, '_ModulePathPatchDefined'):
+        # 只在第一次定义
+        class ModulePathPatch:
+            def __init__(self):
+                self._path = []
+            
+            def __iter__(self):
+                return iter(self._path)
+        
+        # 标记已定义
+        sys._ModulePathPatchDefined = True
+        # 保存类引用以便重用
+        sys._ModulePathPatchClass = ModulePathPatch
+    else:
+        # 重用已定义的类
+        ModulePathPatch = sys._ModulePathPatchClass
+    
+    # 应用补丁
+    if not hasattr(torch.classes, '__path__'):
+        torch.classes.__path__ = ModulePathPatch()
+
 def main():
     """主应用入口函数"""
-# --- 页面配置 ---
+    # --- 修复PyTorch和Streamlit兼容性问题 ---
+    if hasattr(torch, 'classes') and not hasattr(torch.classes, '__path__'):
+        if hasattr(sys, '_ModulePathPatchClass'):
+            # 使用已定义的补丁类
+            torch.classes.__path__ = sys._ModulePathPatchClass()
+    
+    # --- 增加额外的asyncio事件循环处理 ---
+    try:
+        # 尝试获取当前事件循环，如果不存在则创建一个
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+        # 再次应用nest_asyncio以处理嵌套循环
+        nest_asyncio.apply()
+    except Exception as e:
+        # 异常不会影响主程序运行，只打印警告
+        print(f"事件循环初始化警告（可忽略）: {e}")
+    
+    # --- 页面配置 ---
     st.set_page_config(page_title="喵搭服装识别训练场", layout="wide")
     st.title("👕喵搭👗服装识别模型训练场")
-st.markdown("--- ")
+    st.markdown("--- ")
     
     # --- 初始化会话状态 ---
     initialize_session_state()
+    
+    # --- 训练控制移到侧边栏最顶部 ---
+    st.sidebar.subheader("🚀 训练控制")
+    train_button_col, stop_button_col = st.sidebar.columns(2)
+    start_training = train_button_col.button("开始训练！", use_container_width=True, key="start_training_btn")
+    stop_training = stop_button_col.button("停止训练", use_container_width=True, key="stop_training_btn")
+    
+    if stop_training:
+        st.session_state.stop_requested = True
+        st.sidebar.warning("收到停止请求...将在当前轮次结束后尝试停止。")
+    
+    st.sidebar.markdown("---")
     
     # --- 创建侧边栏配置面板 ---
     selected_device, selected_gpu_index, training_params = create_config_panel(
@@ -90,23 +150,23 @@ st.markdown("--- ")
     
     # --- 创建主界面 ---
     col_main_1, col_main_2 = st.columns([2, 1])  # 状态/图表区 vs 日志区
-
-with col_main_1:
-    st.subheader("📊 训练状态与指标")
+    
+    with col_main_1:
+        st.subheader("📊 训练状态与指标")
         status_placeholder = st.empty()
         overall_progress_bar = st.progress(0.0)
         epoch_info_placeholder = st.empty()
-    time_info_placeholder = st.empty()
-    diagnostic_report_placeholder = st.empty()
-    functional_test_placeholder = st.empty()
-    loss_chart_placeholder = st.empty()
-    acc_chart_placeholder = st.empty()
-
-with col_main_2:
-    st.subheader("📜 训练日志")
-    log_placeholder = st.empty() 
-    log_placeholder.code("", language='log')
-
+        time_info_placeholder = st.empty()
+        diagnostic_report_placeholder = st.empty()
+        functional_test_placeholder = st.empty()
+        loss_chart_placeholder = st.empty()
+        acc_chart_placeholder = st.empty()
+    
+    with col_main_2:
+        st.subheader("📜 训练日志")
+        log_placeholder = st.empty()
+        log_placeholder.code("", language='log')
+    
     # --- 创建GPU监控区域 ---
     st.sidebar.markdown("--- ")
     st.sidebar.subheader("📈 GPU 监控")
@@ -118,15 +178,6 @@ with col_main_2:
     if selected_gpu_index is not None:
         gpu_chart_placeholders = (gpu_util_chart_placeholder, gpu_mem_chart_placeholder)
         update_gpu_info(selected_gpu_index, gpu_info_placeholder, gpu_chart_placeholders)
-    
-    # --- 训练控制 ---
-    train_button_col, stop_button_col = st.sidebar.columns(2)
-    start_training = train_button_col.button("🚀 开始训练！")
-    stop_training = stop_button_col.button("⏹️ 停止训练")
-    
-    if stop_training:
-        st.session_state.stop_requested = True
-        st.sidebar.warning("收到停止请求...将在当前轮次结束后尝试停止。")
     
     # --- 触发训练过程 ---
     if start_training:
@@ -174,16 +225,24 @@ with col_main_2:
                         st.warning(f"⚠️ {model_name}: {message}")
             st.rerun()  # 刷新显示
     
+    # 确保会话状态中有show_failed
+    if "show_failed" not in st.session_state:
+        st.session_state.show_failed = True
+    
     with col2:
         st.session_state.show_failed = st.checkbox(
             "显示失败的训练",
-            value=True,
-            key="main_show_failed_checkbox",
+            value=st.session_state.show_failed,
+            key="main_ui_show_failed_checkbox",
             help="勾选显示训练失败的记录"
         )
     
     # 显示历史记录
-                display_history()
+    try:
+        display_history()
+    except Exception as e:
+        st.error(f"显示历史记录时出错: {e}")
+        st.info("请尝试重新启动应用或检查训练结果文件是否损坏")
     
     # --- 元数据查看区域 ---
     with st.expander("🔍 查看模型元数据", expanded=False):

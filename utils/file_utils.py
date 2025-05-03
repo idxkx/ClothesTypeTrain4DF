@@ -4,7 +4,13 @@ import streamlit as st
 
 def safe_path(path):
     """自动规范化路径，兼容Windows和Linux"""
-    return os.path.normpath(path) if path else ""
+    if not path:  # 检查None和空字符串
+        return ""
+    try:
+        return os.path.normpath(path)
+    except (TypeError, ValueError) as e:
+        print(f"路径规范化错误: {e}, 原路径: {path}")
+        return ""
 
 def load_results(file_path="training_results.json"):
     """加载历史训练结果"""

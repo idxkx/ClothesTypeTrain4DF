@@ -9,9 +9,17 @@ import shutil
 from datetime import datetime
 import sys
 import traceback
+import torch
+from torchvision import transforms
 
 # 添加项目根目录到路径
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# 导入模型定义
+try:
+    from model import ClothesModel
+except ImportError as e:
+    st.error(f"错误：无法导入 ClothesModel。请确保 model.py 在项目根目录下。错误: {e}")
 
 # 常量定义
 LABEL_DATA_DIR = "../labeled_data"
@@ -20,6 +28,9 @@ CATEGORY_FILE = "list_category_cloth.txt"
 ATTRIBUTE_FILE = "list_attr_cloth.txt"
 CUSTOM_CATEGORIES_FILE = "../custom_categories.json"
 CUSTOM_ATTRIBUTES_FILE = "../custom_attributes.json"
+RESULTS_FILE = "../training_results.json"
+# 新增：映射文件常量
+MAPPING_FILE = "../name_mapping.json"
 
 # 页面配置
 st.set_page_config(page_title="数据标注工具", layout="wide")
@@ -179,8 +190,48 @@ def save_image(image, image_id):
         st.error(traceback.format_exc())
         return False
 
+# 加载训练结果
+def load_results():
+    """加载历史训练结果"""
+    results_path = os.path.join(os.path.dirname(__file__), RESULTS_FILE)
+    try:
+        with open(results_path, 'r', encoding='utf-8') as f:
+            results = json.load(f)
+        return results if isinstance(results, list) else []
+    except FileNotFoundError:
+        st.warning(f"未找到训练结果文件: {results_path}。请先在主页面完成至少一次训练。")
+        return []
+    except json.JSONDecodeError:
+        st.error(f"训练结果文件 {results_path} 格式错误。")
+        return []
+
+# 加载名称映射
+def load_name_mapping():
+    """加载类别和属性的中英文映射"""
+    mapping_path = os.path.join(os.path.dirname(__file__), MAPPING_FILE)
+    try:
+        with open(mapping_path, 'r', encoding='utf-8') as f:
+            mapping = json.load(f)
+        # 提供默认空字典，防止文件不包含某个键
+        return mapping.get("categories", {}), mapping.get("attributes", {})
+    except FileNotFoundError:
+        return {}, {}
+    except json.JSONDecodeError:
+        st.error(f"名称映射文件 {mapping_path} 格式错误。")
+        return {}, {}
+
+# 图像预处理 (与验证集相同)
+img_size = 224
+normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                std=[0.229, 0.224, 0.225])
+eval_transform = transforms.Compose([
+    transforms.Resize((img_size, img_size)),
+    transforms.ToTensor(),
+    normalize,
+])
+
 # 页面功能区域
-tabs = st.tabs(["标注新图片", "管理自定义类别", "管理已标注数据", "导出数据"])
+tabs = st.tabs(["标注新图片", "管理自定义类别", "管理已标注数据", "导出数据", "模型测试"])
 
 # 标注新图片选项卡
 with tabs[0]:
@@ -747,4 +798,304 @@ with tabs[3]:
                 window.parent.location.href = "/";
             </script>
             """
-            st.components.v1.html(js) 
+            st.components.v1.html(js)
+
+# 新增: 模型测试选项卡
+with tabs[4]:
+    st.header("使用新生成的模型进行测试")
+    
+    # 模型选择方式
+    model_selection_method = st.radio(
+        "选择模型方式:",
+        ["从下拉列表选择", "自定义模型路径"],
+        key="model_selection_method"
+    )
+    
+    # 从训练历史中获取模型
+    if model_selection_method == "从下拉列表选择":
+        all_results = load_results()
+        # 筛选出成功的训练运行
+        successful_runs = [
+            r for r in all_results
+            if r.get("status") == "已完成" and
+               r.get("functional_test_result") == "成功" and
+               r.get("best_model_path") and
+               os.path.exists(os.path.join(os.path.dirname(__file__), '..', r["best_model_path"]))
+        ]
+
+        model_options = {"请选择模型": None}
+        if successful_runs:
+            for run in sorted(successful_runs, key=lambda x: x.get("end_time", 0), reverse=True):
+                option_label = f"{run.get('model_name', '未知模型')} (完成于 {run.get('end_time_str', '未知时间')}, Backbone: {run.get('backbone', '未知')})"
+                model_options[option_label] = {
+                    "path": os.path.join(os.path.dirname(__file__), '..', run["best_model_path"]), 
+                    "backbone": run.get("backbone"),
+                    # 使用默认路径作为备选
+                    "anno_dir": run.get("anno_dir", ANNO_FINE_DIR) 
+                }
+        else:
+            st.warning("没有找到符合条件的训练好的模型记录。请先在主页面完成至少一次训练或选择自定义模型路径。")
+
+        selected_model = st.selectbox(
+            "选择训练好的模型:",
+            list(model_options.keys()),
+            key="model_selection_dropdown"
+        )
+        
+        selected_model_info = model_options.get(selected_model)
+        
+        # 如果选择了模型，显示模型信息
+        if selected_model_info:
+            st.success(f"已选择模型，骨干网络: {selected_model_info.get('backbone', '未知')}")
+            model_path = selected_model_info.get("path")
+            backbone = selected_model_info.get("backbone")
+            anno_dir = selected_model_info.get("anno_dir")
+    
+    # 自定义模型路径
+    else:
+        model_dir = st.text_input(
+            "输入模型目录路径 (例如：models/MD_RESNET18_5_64_50E04_DEMO):",
+            key="custom_model_dir"
+        )
+        
+        if model_dir:
+            full_model_dir = os.path.join(os.path.dirname(__file__), '..', model_dir)
+            
+            if os.path.isdir(full_model_dir):
+                # 列出目录中的.pth文件
+                model_files = [f for f in os.listdir(full_model_dir) if f.endswith('.pth')]
+                
+                if model_files:
+                    selected_model_file = st.selectbox(
+                        "选择模型文件:",
+                        model_files,
+                        key="custom_model_file"
+                    )
+                    
+                    if selected_model_file:
+                        model_path = os.path.join(full_model_dir, selected_model_file)
+                        
+                        # 选择骨干网络
+                        backbone = st.selectbox(
+                            "选择骨干网络:",
+                            ["resnet18", "resnet34", "resnet50", "efficientnet_b0", "efficientnet_b3"],
+                            key="custom_model_backbone"
+                        )
+                        
+                        # 使用默认的Anno_fine目录
+                        anno_dir = ANNO_FINE_DIR
+                        
+                        st.success(f"已选择模型: {model_path}")
+                else:
+                    st.error(f"在目录 {full_model_dir} 中没有找到 .pth 模型文件")
+                    model_path = None
+                    backbone = None
+                    anno_dir = None
+            else:
+                st.error(f"目录 {full_model_dir} 不存在")
+                model_path = None
+                backbone = None
+                anno_dir = None
+        else:
+            model_path = None
+            backbone = None
+            anno_dir = None
+    
+    # 图片上传区域
+    uploaded_file = st.file_uploader(
+        "上传一张服装图片进行测试:",
+        type=["jpg", "jpeg", "png"],
+        key="test_image_upload"
+    )
+    
+    # 结果显示区域
+    col_img, col_results = st.columns(2)
+    
+    if uploaded_file is not None:
+        try:
+            image = Image.open(uploaded_file).convert('RGB')
+            with col_img:
+                st.image(image, caption="上传的测试图片", use_column_width=True)
+        except Exception as e:
+            st.error(f"无法加载图片: {e}")
+            uploaded_file = None  # 阻止后续处理
+    
+    # 测试按钮
+    if st.button("🚀 开始测试！", key="start_testing_btn"):
+        if not model_path:
+            st.error("请先选择一个模型。")
+        elif not uploaded_file:
+            st.error("请先上传一张图片。")
+        else:
+            should_proceed = True
+            
+            # 验证Anno目录
+            if not os.path.isdir(anno_dir):
+                st.warning(f"指定的Anno_fine目录不存在: {anno_dir}")
+                should_proceed = False
+            
+            if should_proceed:
+                # 加载类别和属性映射
+                category_mapping, attribute_mapping = load_name_mapping()
+                
+                # 开始识别流程
+                with st.spinner("正在加载模型并进行测试..."):
+                    try:
+                        # 1. 加载类别和属性名称
+                        category_names = {}
+                        try:
+                            with open(os.path.join(anno_dir, CATEGORY_FILE), 'r') as f:
+                                lines = f.readlines()
+                                for i, line in enumerate(lines[2:]):
+                                    parts = line.strip().split()
+                                    if len(parts) >= 1:
+                                        category_name = ' '.join(parts[:-1])
+                                        category_names[i + 1] = category_name
+                        except Exception as e:
+                            st.error(f"读取类别文件失败: {e}")
+                            category_names = {}
+                        
+                        attribute_names = {}
+                        try:
+                            with open(os.path.join(anno_dir, ATTRIBUTE_FILE), 'r') as f:
+                                lines = f.readlines()
+                                for i, line in enumerate(lines[2:]):
+                                    parts = line.strip().split()
+                                    if len(parts) >= 1:
+                                        attribute_name = ' '.join(parts[:-1])
+                                        attribute_names[i] = attribute_name
+                        except Exception as e:
+                            st.error(f"读取属性文件失败: {e}")
+                            attribute_names = {}
+                        
+                        # 2. 加载模型
+                        model = ClothesModel(num_categories=50, backbone=backbone)
+                        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                        model.load_state_dict(torch.load(model_path, map_location=device))
+                        model.to(device)
+                        model.eval()
+                        
+                        # 3. 预处理图片
+                        img_tensor = eval_transform(image).unsqueeze(0).to(device)
+                        
+                        # 4. 模型推理
+                        with torch.no_grad():
+                            cat_logits, attr_logits = model(img_tensor)
+                        
+                        # 5. 解析结果
+                        # 类别 - 获取所有类别的概率分布
+                        cat_probs = torch.softmax(cat_logits, dim=1).squeeze(0).cpu().numpy()
+                        
+                        # 创建类别索引、名称和概率的列表
+                        cat_data = []
+                        for idx in range(len(cat_probs)):
+                            cat_id = idx + 1  # 类别ID从1开始
+                            en_cat_name = category_names.get(cat_id, f"Unknown (ID: {cat_id})")
+                            zh_cat_name = category_mapping.get(en_cat_name)
+                            display_cat_name = f"{zh_cat_name} ({en_cat_name})" if zh_cat_name else en_cat_name
+                            cat_data.append({
+                                'index': cat_id,
+                                'name': display_cat_name,
+                                'probability': cat_probs[idx]
+                            })
+                        
+                        # 按概率降序排序
+                        cat_data.sort(key=lambda x: x['probability'], reverse=True)
+                        
+                        # 获取概率最高的类别
+                        top_category = cat_data[0]
+                        
+                        # 属性 (使用 Sigmoid 获取所有属性的概率)
+                        attr_probs = torch.sigmoid(attr_logits).squeeze(0).cpu().numpy()
+                        
+                        # 创建属性索引、名称和概率的列表
+                        attr_data = []
+                        for idx, prob in enumerate(attr_probs):
+                            en_attr_name = attribute_names.get(idx, f"Unknown Attr (Idx: {idx})")
+                            zh_attr_name = attribute_mapping.get(en_attr_name)
+                            display_attr_name = f"{zh_attr_name} ({en_attr_name})" if zh_attr_name else en_attr_name
+                            attr_data.append({
+                                'index': idx,
+                                'name': display_attr_name, 
+                                'probability': prob
+                            })
+                        
+                        # 按概率降序排序
+                        attr_data.sort(key=lambda x: x['probability'], reverse=True)
+                        
+                        # 6. 显示结果
+                        with col_results:
+                            st.subheader("测试结果:")
+                            
+                            # 显示类别预测结果
+                            st.markdown("**预测类别及概率:**")
+                            # 显示前3个最可能的类别
+                            cols_cat = st.columns(3)
+                            for i, cat in enumerate(cat_data[:3]):
+                                with cols_cat[i]:
+                                    if i == 0:  # 最高概率用绿色
+                                        st.success(f"{cat['name']} ({cat['probability']*100:.1f}%)")
+                                    else:  # 其他候选用蓝色
+                                        st.info(f"{cat['name']} ({cat['probability']*100:.1f}%)")
+                            
+                            # 类别详情折叠面板
+                            with st.expander("查看所有类别概率详情"):
+                                # 显示前10个最可能的类别
+                                st.markdown("##### 前10个最可能的类别:")
+                                cat_top10_df = pd.DataFrame(cat_data[:10])
+                                cat_top10_df.columns = ["ID", "类别名称", "概率"]
+                                cat_top10_df["概率"] = cat_top10_df["概率"].apply(lambda x: f"{x*100:.2f}%")
+                                st.dataframe(cat_top10_df)
+                            
+                            # 显示属性预测结果
+                            st.markdown("**预测属性及概率:**")
+                            
+                            # 阈值选择
+                            threshold = st.slider(
+                                "属性置信度阈值",
+                                min_value=0.0,
+                                max_value=1.0,
+                                value=0.3,
+                                step=0.05,
+                                key="test_confidence_threshold"
+                            )
+                            
+                            # 筛选属性
+                            filtered_attrs = [attr for attr in attr_data if attr['probability'] >= threshold]
+                            
+                            if filtered_attrs:
+                                # 分组显示属性
+                                # 高概率组 (>0.7)
+                                high_prob_attrs = [attr for attr in filtered_attrs if attr['probability'] > 0.7]
+                                if high_prob_attrs:
+                                    st.markdown("##### 高置信度属性 (>70%)")
+                                    cols_attr = st.columns(3)
+                                    for i, attr in enumerate(high_prob_attrs):
+                                        with cols_attr[i % 3]:
+                                            st.success(f"{attr['name']} ({attr['probability']*100:.1f}%)")
+                                
+                                # 中概率组 (0.5-0.7)
+                                medium_prob_attrs = [attr for attr in filtered_attrs if 0.5 <= attr['probability'] <= 0.7]
+                                if medium_prob_attrs:
+                                    st.markdown("##### 中等置信度属性 (50%-70%)")
+                                    cols_attr = st.columns(3)
+                                    for i, attr in enumerate(medium_prob_attrs):
+                                        with cols_attr[i % 3]:
+                                            st.info(f"{attr['name']} ({attr['probability']*100:.1f}%)")
+                                
+                                # 低概率组 (阈值-0.5)
+                                low_prob_attrs = [attr for attr in filtered_attrs if attr['probability'] < 0.5]
+                                if low_prob_attrs:
+                                    st.markdown("##### 低置信度属性 (<50%)")
+                                    cols_attr = st.columns(3)
+                                    for i, attr in enumerate(low_prob_attrs):
+                                        with cols_attr[i % 3]:
+                                            st.warning(f"{attr['name']} ({attr['probability']*100:.1f}%)")
+                            else:
+                                st.write("在当前阈值下未检测到显著属性。")
+                            
+                            st.success("测试完成！")
+                    
+                    except Exception as e:
+                        st.error(f"测试过程中发生错误: {e}")
+                        st.error(traceback.format_exc()) 

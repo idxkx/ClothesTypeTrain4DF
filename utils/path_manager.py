@@ -62,23 +62,92 @@ def update_config_paths(config_path, anno_dir=None, img_dir=None):
 
 def get_model_save_dir(model_name):
     """获取模型保存目录"""
-    return os.path.join('.', 'models', model_name)
+    if not model_name:
+        print("警告：模型名称为空，将使用默认目录")
+        model_name = f"model_{int(os.path.getmtime('.'))}"  # 使用当前时间戳生成默认名称
+        
+    base_dir = os.path.join('.', 'models')
+    
+    # 确保基础目录存在
+    try:
+        if not os.path.exists(base_dir):
+            os.makedirs(base_dir)
+            print(f"创建模型目录: {base_dir}")
+    except Exception as e:
+        print(f"创建基础模型目录失败: {e}")
+        
+    full_path = os.path.join(base_dir, model_name)
+    
+    # 确保完整路径存在
+    try:
+        if not os.path.exists(full_path):
+            os.makedirs(full_path)
+            print(f"创建模型保存目录: {full_path}")
+    except Exception as e:
+        print(f"创建模型保存目录失败: {e}")
+        
+    return full_path
 
 def get_model_path(model_dir, model_name, epoch=None):
     """获取模型文件路径"""
+    # 检查参数有效性
+    if not model_dir or not os.path.exists(model_dir):
+        print(f"警告：模型目录无效或不存在: {model_dir}")
+        return None
+        
+    if not model_name:
+        print("警告：模型名称为空")
+        return None
+        
     if epoch:
-        return os.path.join(model_dir, f"best_model_{model_name}_epoch{epoch}.pth")
+        model_path = os.path.join(model_dir, f"best_model_{model_name}_epoch{epoch}.pth")
+        if os.path.exists(model_path):
+            return model_path
+        else:
+            print(f"警告：指定轮次的模型文件不存在: {model_path}")
+            return None
     else:
         # 查找最佳模型文件
-        possible_files = [f for f in os.listdir(model_dir) 
-                           if f.startswith(f"best_model_{model_name}") and f.endswith(".pth")]
-        if not possible_files:
+        try:
+            possible_files = [f for f in os.listdir(model_dir) 
+                             if f.startswith(f"best_model_{model_name}") and f.endswith(".pth")]
+            if not possible_files:
+                print(f"警告：未找到匹配的模型文件，目录: {model_dir}, 名称: {model_name}")
+                return None
+                
+            # 按文件名中的epoch排序，取最新的
+            try:
+                possible_files.sort(key=lambda x: int(x.split('_epoch')[-1].split('.')[0]), reverse=True)
+            except (ValueError, IndexError):
+                # 如果排序失败，按文件修改时间排序
+                possible_files.sort(key=lambda x: os.path.getmtime(os.path.join(model_dir, x)), reverse=True)
+                
+            model_path = os.path.join(model_dir, possible_files[0])
+            if os.path.exists(model_path):
+                return model_path
+            else:
+                print(f"警告：选择的模型文件不存在: {model_path}")
+                return None
+        except Exception as e:
+            print(f"获取模型路径时出错: {e}")
             return None
-            
-        # 按文件名中的epoch排序，取最新的
-        possible_files.sort(key=lambda x: int(x.split('_epoch')[-1].split('.')[0]), reverse=True)
-        return os.path.join(model_dir, possible_files[0])
 
 def get_metadata_path(model_dir, model_name):
     """获取模型元数据文件路径"""
-    return os.path.join(model_dir, f"{model_name}_metadata.json") 
+    if not model_dir or not os.path.exists(model_dir):
+        print(f"警告：模型目录无效或不存在: {model_dir}")
+        return None
+        
+    if not model_name:
+        print("警告：模型名称为空")
+        return None
+        
+    metadata_path = os.path.join(model_dir, f"{model_name}_metadata.json")
+    
+    # 验证路径有效性
+    if os.path.exists(metadata_path):
+        return metadata_path
+    else:
+        # 元数据可能尚未创建，返回期望路径但打印警告
+        print(f"提示：元数据文件尚未存在: {metadata_path}")
+        return metadata_path 

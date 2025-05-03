@@ -11,13 +11,25 @@ import re
 from utils.state_manager import append_log
 
 def generate_diagnostic_report(history_df, best_val_loss, total_epochs):
-    """根据训练历史生成诊断报告"""
+    """根据训练历史生成诊断报告和结构化评估结果"""
     report = []
     report.append("### 🩺 训练诊断报告")
+    
+    # 创建一个结构化结果字典
+    result_data = {
+        "overfitting_risk": "未知",
+        "loss_diff": float('nan'),
+        "accuracy_diff": float('nan'),
+        "convergence_status": "未知",
+        "best_epoch": None,
+        "best_val_loss": best_val_loss if math.isfinite(best_val_loss) else None,
+        "final_val_loss": None,
+        "final_val_accuracy": None
+    }
 
     if history_df is None or history_df.empty:
         report.append("- ❌ 无法生成报告：缺少训练历史数据。")
-        return "\n".join(report)
+        return "\n".join(report), result_data
 
     final_epoch_data = history_df.iloc[-1]
     best_epoch_data = history_df.loc[history_df['Validation Loss'].idxmin()] if 'Validation Loss' in history_df.columns and history_df['Validation Loss'].notna().any() else None
@@ -25,23 +37,36 @@ def generate_diagnostic_report(history_df, best_val_loss, total_epochs):
     # 1. 整体表现
     report.append(f"- **训练轮数:** {len(history_df)} / {total_epochs}")
     if best_epoch_data is not None:
-        report.append(f"- **最佳验证损失:** {best_epoch_data['Validation Loss']:.4f} (出现在 Epoch {int(best_epoch_data['epoch'])})")
+        best_epoch = int(best_epoch_data['epoch'])
+        report.append(f"- **最佳验证损失:** {best_epoch_data['Validation Loss']:.4f} (出现在 Epoch {best_epoch})")
+        result_data["best_epoch"] = best_epoch
     else:
         report.append("- **最佳验证损失:** 未记录或无效。")
+    
+    result_data["final_val_loss"] = final_epoch_data['Validation Loss']
+    result_data["final_val_accuracy"] = final_epoch_data['Validation Accuracy (%)']
+    
     report.append(f"- **最终验证损失:** {final_epoch_data['Validation Loss']:.4f}")
     report.append(f"- **最终验证准确率:** {final_epoch_data['Validation Accuracy (%)']:.2f}%")
 
     # 2. 收敛性分析
+    convergence_status = "未知"
     if len(history_df) >= 5:
         last_5_val_loss = history_df['Validation Loss'].tail(5)
         if last_5_val_loss.is_monotonic_decreasing:
+            convergence_status = "持续改善"
             report.append("- **收敛性:** ✅ 验证损失在最后5轮持续下降，可能仍有提升空间。")
         elif last_5_val_loss.iloc[-1] < last_5_val_loss.iloc[0]:
+            convergence_status = "波动下降"
             report.append("- **收敛性:** ⚠️ 验证损失在最后5轮有所波动，但整体仍在下降。")
         else:
-             report.append("- **收敛性:** ❌ 验证损失在最后5轮未能持续下降，可能已收敛或遇到瓶颈。")
+            convergence_status = "已收敛或停滞"
+            report.append("- **收敛性:** ❌ 验证损失在最后5轮未能持续下降，可能已收敛或遇到瓶颈。")
     else:
+        convergence_status = "轮数不足"
         report.append("- **收敛性:** ⚠️ 训练轮数较少，难以判断收敛趋势。")
+    
+    result_data["convergence_status"] = convergence_status
 
     # 3. 过拟合风险
     train_loss_final = final_epoch_data.get('Train Loss', float('nan'))
@@ -51,19 +76,47 @@ def generate_diagnostic_report(history_df, best_val_loss, total_epochs):
 
     loss_diff = abs(train_loss_final - val_loss_final) if math.isfinite(train_loss_final) and math.isfinite(val_loss_final) else float('inf')
     acc_diff = abs(train_acc_final - val_acc_final) if math.isfinite(train_acc_final) and math.isfinite(val_acc_final) else float('inf')
+    
+    result_data["loss_diff"] = loss_diff
+    result_data["accuracy_diff"] = acc_diff
 
-    # 设定一些简单的阈值
+    # 设定过拟合风险阈值
     overfitting_risk = "低"
-    if loss_diff > 0.5 or acc_diff > 15:
+    risk_details = []
+    
+    if loss_diff > 0.5:
+        risk_details.append(f"损失差异({loss_diff:.2f})大于0.5")
         overfitting_risk = "高"
-    elif loss_diff > 0.2 or acc_diff > 8:
+    elif loss_diff > 0.2:
+        risk_details.append(f"损失差异({loss_diff:.2f})大于0.2")
         overfitting_risk = "中"
-
-    report.append(f"- **过拟合风险:** {overfitting_risk} (基于最终损失差异 {loss_diff:.2f} 和准确率差异 {acc_diff:.1f}%) ")
+        
+    if acc_diff > 15:
+        risk_details.append(f"准确率差异({acc_diff:.1f}%)大于15%")
+        overfitting_risk = "高"
+    elif acc_diff > 8:
+        risk_details.append(f"准确率差异({acc_diff:.1f}%)大于8%")
+        if overfitting_risk != "高":
+            overfitting_risk = "中"
+    
+    result_data["overfitting_risk"] = overfitting_risk
+    
+    # 格式化风险详情
+    risk_detail_text = "，".join(risk_details) if risk_details else "训练集和验证集表现相近"
+    
+    report.append(f"- **过拟合风险:** {overfitting_risk} ")
+    report.append(f"  - **损失差异:** {loss_diff:.2f} | **准确率差异:** {acc_diff:.1f}%") 
+    report.append(f"  - **原因:** {risk_detail_text}")
+    
     if overfitting_risk != "低":
-        report.append("  - _建议: 可尝试增加正则化、数据增强或提前停止。_")
+        recommendation = ""
+        if overfitting_risk == "高":
+            recommendation = "建议: 增强正则化(增加dropout或权重衰减)、增加数据增强或缩小模型规模"
+        else:  # 中风险
+            recommendation = "建议: 考虑适当增加正则化或提前停止训练"
+        report.append(f"  - _{recommendation}_")
 
-    return "\n".join(report)
+    return "\n".join(report), result_data
 
 def run_functional_test(model_save_dir, model_name, model_config, device):
     """尝试加载最佳模型并进行一次模拟推理，同时检查元数据文件"""
@@ -73,6 +126,35 @@ def run_functional_test(model_save_dir, model_name, model_config, device):
     error_details = {}
     
     try:
+        # 检查参数有效性
+        if not model_save_dir:
+            report.append("- ❌ 模型保存目录为空")
+            error_details["error_type"] = "empty_save_dir"
+            error_details["message"] = "模型保存目录为空，无法进行功能测试"
+            error_details["solution"] = "请确保已指定有效的模型保存目录"
+            return "\n".join(report), False, error_details
+            
+        if not os.path.exists(model_save_dir):
+            report.append(f"- ❌ 模型保存目录不存在: {model_save_dir}")
+            error_details["error_type"] = "dir_not_found"
+            error_details["message"] = f"指定的模型保存目录不存在: {model_save_dir}"
+            error_details["solution"] = "请检查模型保存路径是否正确，可能需要重新训练模型"
+            return "\n".join(report), False, error_details
+            
+        if not model_name:
+            report.append("- ❌ 模型名称为空")
+            error_details["error_type"] = "empty_model_name"
+            error_details["message"] = "模型名称为空，无法定位模型文件"
+            error_details["solution"] = "请确保模型名称已正确设置" 
+            return "\n".join(report), False, error_details
+            
+        if not model_config:
+            report.append("- ❌ 模型配置为空")
+            error_details["error_type"] = "empty_config"
+            error_details["message"] = "模型配置为空，无法初始化模型"
+            error_details["solution"] = "请提供有效的模型配置" 
+            return "\n".join(report), False, error_details
+        
         # 提取模型名称的基础部分，忽略可能的时间戳
         # 例如：从 "MD_RESNET18_5_64_50E04_0503_1137" 提取 "MD_RESNET18_5_64_50E04"
         base_model_name = model_name
@@ -81,7 +163,15 @@ def run_functional_test(model_save_dir, model_name, model_config, device):
         base_model_name = re.sub(time_stamp_pattern, '', base_model_name)
         
         # 查找模型文件的方式更灵活
-        all_files = os.listdir(model_save_dir)
+        try:
+            all_files = os.listdir(model_save_dir)
+        except Exception as e:
+            report.append(f"- ❌ 无法读取模型目录: {e}")
+            error_details["error_type"] = "directory_read_error"
+            error_details["message"] = f"读取模型目录时出错: {e}"
+            error_details["solution"] = "请检查模型目录权限或是否可访问"
+            return "\n".join(report), False, error_details
+            
         # 1. 首先尝试完全匹配
         possible_files = [f for f in all_files if f.startswith(f"best_model_{model_name}") and f.endswith(".pth")]
         
@@ -121,12 +211,12 @@ def run_functional_test(model_save_dir, model_name, model_config, device):
         
         metadata_file = None
         for meta_path in possible_metadata_files:
-            if os.path.exists(meta_path):
+            if meta_path and os.path.exists(meta_path):  # 添加对meta_path非None的检查
                 metadata_file = meta_path
                 break
 
         # 读取并显示基本元数据信息
-        if metadata_file:
+        if metadata_file and os.path.exists(metadata_file):  # 添加对metadata_file非None的检查
             report.append(f"- ✅ 找到元数据文件: `{metadata_file}`")
             try:
                 with open(metadata_file, 'r', encoding='utf-8') as f:
@@ -290,144 +380,202 @@ def run_functional_test(model_save_dir, model_name, model_config, device):
         return "\n".join(report), False, error_details
 
 def generate_metadata_for_model(model_result):
-    """为单个模型生成元数据"""
+    """为单个模型生成元数据文件"""
     try:
         model_name = model_result.get("model_name", "")
         model_path = model_result.get("best_model_path", "")
-        if not model_path or not os.path.exists(model_path):
+        
+        if not model_name:
+            return False, "模型名称为空"
+            
+        if not model_path:
+            return False, "模型路径为空"
+            
+        if not os.path.exists(model_path):
             return False, f"模型文件不存在: {model_path}"
-
-        # 构建元数据
+        
+        # 提取模型目录
+        model_dir = os.path.dirname(model_path)
+        if not model_dir:
+            return False, "无法提取模型目录"
+            
+        # 元数据文件路径
+        metadata_file = os.path.join(model_dir, f"{model_name}_metadata.json")
+        
+        # 检查是否已存在
+        if metadata_file and os.path.exists(metadata_file):
+            return True, "元数据已存在"
+        
+        # 从训练结果中提取基本信息
+        backbone = model_result.get("backbone", "unknown")
+        num_categories = model_result.get("num_categories", 13)
+        input_size = model_result.get("image_size", 224)
+        learning_rate = model_result.get("learning_rate", 0.0001)
+        batch_size = model_result.get("batch_size", 32)
+        total_epochs = model_result.get("total_epochs", 50)
+        
+        # 完成的训练轮数
+        completed_epochs = model_result.get("completed_epochs", 0)
+        
+        # 查找性能指标
+        best_val_loss = model_result.get("best_val_loss", 0.0)
+        best_val_acc = model_result.get("best_val_accuracy", 0.0)
+        best_epoch = model_result.get("best_epoch", 0)
+        
+        # 默认的类别和特征
+        # 这些可以从其他地方导入，但为了简单起见，我们在这里硬编码
+        from utils.state_manager import get_default_categories, get_default_features
+        class_names = get_default_categories()
+        feature_names = get_default_features()
+        
+        # 创建元数据字典
         metadata = {
             "model_name": model_name,
-            "version": "1.0.0",
-            "description": f"基于{model_result.get('backbone', 'unknown')}的服装分类模型",
-            "architecture": model_result.get('backbone', 'unknown'),
-            "input_shape": [3, 224, 224],  # 标准输入尺寸
-            "framework": "PyTorch",
-            "date_created": model_result.get("start_time_str", "").split()[0],  # 只取日期部分
-            "trained_by": "喵搭服装识别训练平台",
-            "training_params": {
-                "epochs": model_result.get("total_epochs"),
-                "completed_epochs": model_result.get("completed_epochs"),
-                "best_val_loss": model_result.get("best_val_loss"),
-                "best_epoch": model_result.get("best_epoch"),
-                "strategy": model_result.get("strategy"),
-                "status": model_result.get("status"),
+            "version": "1.0",
+            "date_created": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "architecture": f"ClothesModel({backbone})",
+            "input_shape": [3, input_size, input_size],
+            "preprocessing": {
+                "mean": [0.485, 0.456, 0.406],
+                "std": [0.229, 0.224, 0.225],
+                "resize": input_size
             },
-            # 添加默认的类别和特征名称
-            "class_names": [
-                "T恤", "衬衫", "卫衣", "毛衣", "西装", "夹克", "羽绒服", "风衣",
-                "牛仔裤", "休闲裤", "西裤", "短裤", "运动裤", "连衣裙", "半身裙",
-                "旗袍", "礼服", "运动鞋", "皮鞋", "高跟鞋", "靴子", "凉鞋", "拖鞋",
-                "帽子", "围巾", "领带", "手套", "袜子", "腰带", "眼镜", "手表",
-                "项链", "手链", "耳环", "戒指", "包包", "背包", "手提包", "钱包", "行李箱"
-            ],
-            "feature_names": [
-                "颜色", "材质", "样式", "花纹", "季节", "正式度", "领型", "袖长",
-                "长度", "裤型", "鞋型", "高度", "闭合方式"
-            ]
+            "class_names": class_names,
+            "feature_names": feature_names,
+            "training_info": {
+                "backbone": backbone,
+                "learning_rate": learning_rate,
+                "batch_size": batch_size,
+                "epochs": completed_epochs,
+                "best_epoch": best_epoch,
+                "best_val_loss": best_val_loss,
+                "best_val_accuracy": best_val_acc
+            },
+            "export_format": "PyTorch",
+            "usage_examples": {
+                "python": "# 请参考示例代码使用此模型"
+            }
         }
-
-        # 保存元数据文件
-        model_dir = os.path.dirname(model_path)
-        metadata_file = os.path.join(model_dir, f"{model_name}_metadata.json")
-        with open(metadata_file, 'w', encoding='utf-8') as f:
-            json.dump(metadata, f, ensure_ascii=False, indent=4)
         
-        return True, metadata_file
+        # 保存元数据文件
+        try:
+            with open(metadata_file, 'w', encoding='utf-8') as f:
+                json.dump(metadata, f, ensure_ascii=False, indent=2)
+            return True, "元数据创建成功"
+        except Exception as e:
+            return False, f"保存元数据文件时出错: {e}"
+            
     except Exception as e:
+        traceback_info = traceback.format_exc()
+        append_log(f"生成元数据时出错: {traceback_info}")
         return False, f"生成元数据时出错: {e}"
 
 def batch_generate_metadata():
-    """批量为所有缺失元数据的模型生成元数据文件"""
-    from utils.file_utils import load_results
-    
+    """批量生成缺失的元数据"""
     results = []
-    all_models = load_results()
     
-    for model_result in all_models:
-        model_name = model_result.get("model_name", "未命名模型")
-        model_path = model_result.get("best_model_path", "")
+    # 加载所有训练记录
+    all_results = load_results()
+    
+    for model_data in all_results:
+        model_name = model_data.get("model_name", "")
+        model_path = model_data.get("best_model_path", "")
         
-        if not model_path or not os.path.exists(model_path):
-            results.append((model_name, False, "模型文件不存在"))
+        if not model_name or not model_path:
+            results.append((model_name or "未命名模型", False, "模型信息不完整"))
             continue
             
-        # 检查是否已有元数据
-        model_dir = os.path.dirname(model_path)
+        # 检查模型文件是否存在
+        if model_path and not os.path.exists(model_path):
+            results.append((model_name, False, f"模型文件不存在: {model_path}"))
+            continue
+        
+        # 检查元数据文件是否已存在
+        model_dir = os.path.dirname(model_path) if model_path else ""
+        if not model_dir:
+            results.append((model_name, False, "模型路径不完整"))
+            continue
+            
         metadata_file = os.path.join(model_dir, f"{model_name}_metadata.json")
         
-        # 如果有时间戳命名的模型，也尝试检查不带时间戳的元数据文件
-        if not os.path.exists(metadata_file):
-            # 尝试移除时间戳部分并检查
-            base_model_name = re.sub(r'_\d{4}_\d{4}$', '', model_name)
-            alt_metadata_file = os.path.join(model_dir, f"{base_model_name}_metadata.json")
-            if os.path.exists(alt_metadata_file):
-                results.append((model_name, True, f"找到使用基础名称的元数据: {alt_metadata_file}"))
-                continue
-        else:
+        # 如果元数据已存在，跳过
+        if metadata_file and os.path.exists(metadata_file):
             results.append((model_name, True, "元数据已存在"))
             continue
-            
+        
         # 生成元数据
-        success, message = generate_metadata_for_model(model_result)
-        results.append((model_name, success, message))
+        try:
+            success, message = generate_metadata_for_model(model_data)
+            results.append((model_name, success, message))
+        except Exception as e:
+            results.append((model_name, False, f"生成元数据时出错: {str(e)}"))
     
     return results
 
 def create_metadata_file(model_name, model_data, metadata_input):
     """根据用户输入创建元数据文件"""
     try:
-        model_path = model_data.get("best_model_path", "")
-        if not model_path or not os.path.exists(model_path):
-            return False, f"模型文件不存在: {model_path}"
+        if not model_name:
+            return False, "模型名称为空"
             
-        # 解析输入参数
-        version = metadata_input.get("version", "1.0.0")
-        description = metadata_input.get("description", f"基于{model_data.get('backbone', 'unknown')}的服装分类模型")
-        trained_by = metadata_input.get("trained_by", "喵搭服装识别训练平台")
-        date_created = metadata_input.get("date_created", datetime.now().strftime("%Y-%m-%d"))
+        model_path = model_data.get("best_model_path", "")
+        if not model_path:
+            return False, "模型路径为空"
+            
+        if not os.path.exists(model_path):
+            return False, f"模型文件不存在: {model_path}"
         
-        # 解析输入形状
-        input_shape_str = metadata_input.get("input_shape", "3,224,224")
-        input_shape = [int(x.strip()) for x in input_shape_str.split(",")]
+        # 提取模型目录
+        model_dir = os.path.dirname(model_path)
+        if not model_dir:
+            return False, "无法提取模型目录"
+            
+        metadata_file = os.path.join(model_dir, f"{model_name}_metadata.json")
         
-        # 解析类别和特征名称
-        class_names_text = metadata_input.get("class_names", "")
-        class_names = [name.strip() for name in class_names_text.split("\n") if name.strip()]
+        # 检查是否已存在
+        if metadata_file and os.path.exists(metadata_file):
+            # 进行覆盖确认
+            st.warning(f"元数据文件 '{metadata_file}' 已存在，将被覆盖。")
         
-        feature_names_text = metadata_input.get("feature_names", "")
-        feature_names = [name.strip() for name in feature_names_text.split("\n") if name.strip()]
-        
-        # 构建元数据
+        # 准备元数据结构
         metadata = {
             "model_name": model_name,
-            "version": version,
-            "description": description,
-            "architecture": model_data.get('backbone', 'unknown'),
-            "input_shape": input_shape,
-            "framework": "PyTorch",
-            "date_created": date_created,
-            "trained_by": trained_by,
-            "training_params": {
-                "epochs": model_data.get("total_epochs"),
-                "completed_epochs": model_data.get("completed_epochs"),
-                "best_val_loss": model_data.get("best_val_loss"),
-                "best_epoch": model_data.get("best_epoch"),
-                "strategy": model_data.get("strategy"),
-                "status": model_data.get("status"),
+            "version": metadata_input.get("version", "1.0"),
+            "description": metadata_input.get("description", "服装分类与属性识别模型"),
+            "date_created": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "architecture": f"ClothesModel({model_data.get('backbone', 'unknown')})",
+            "input_shape": [3, model_data.get("image_size", 224), model_data.get("image_size", 224)],
+            "preprocessing": {
+                "mean": [0.485, 0.456, 0.406],
+                "std": [0.229, 0.224, 0.225],
+                "resize": model_data.get("image_size", 224)
             },
-            "class_names": class_names,
-            "feature_names": feature_names
+            # 使用提供的类别和特征名称
+            "class_names": metadata_input.get("class_names", []),
+            "feature_names": metadata_input.get("feature_names", []),
+            "training_info": {
+                "backbone": model_data.get("backbone", "unknown"),
+                "learning_rate": model_data.get("learning_rate", 0.0001),
+                "batch_size": model_data.get("batch_size", 32),
+                "epochs": model_data.get("completed_epochs", 0),
+                "best_epoch": model_data.get("best_epoch", 0),
+                "best_val_loss": model_data.get("best_val_loss", 0.0),
+                "best_val_accuracy": model_data.get("best_val_accuracy", 0.0),
+                "status": model_data.get("status", "unknown")
+            },
+            "author": metadata_input.get("author", ""),
+            "contact": metadata_input.get("contact", ""),
+            "license": metadata_input.get("license", ""),
+            "export_format": "PyTorch",
+            "usage_notes": metadata_input.get("usage_notes", "")
         }
         
-        # 保存元数据文件
-        model_dir = os.path.dirname(model_path)
-        metadata_file = os.path.join(model_dir, f"{model_name}_metadata.json")
+        # 保存元数据
         with open(metadata_file, 'w', encoding='utf-8') as f:
-            json.dump(metadata, f, ensure_ascii=False, indent=4)
-            
-        return True, f"已成功创建元数据文件: {metadata_file}"
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
+        
+        return True, "元数据创建成功"
     except Exception as e:
-        return False, f"创建元数据时出错: {e}" 
+        traceback_info = traceback.format_exc()
+        append_log(f"创建元数据文件时出错: {traceback_info}")
+        return False, f"创建元数据文件时出错: {e}" 

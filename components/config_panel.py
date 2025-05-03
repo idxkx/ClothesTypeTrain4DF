@@ -53,21 +53,21 @@ def create_config_panel(ANNO_DIR, IMG_DIR, CONFIG_PATH, nvml_available, gpu_name
     STRATEGIES = {
         "快速体验 (Fast Trial)": {
             "epochs": 5,
-            "batch_size": 64,
+            "batch_size": 128,
             "learning_rate": 5e-4,
             "backbone": 'resnet18',
             "attribute_loss_weight": 1.0
         },
         "均衡推荐 (Balanced)": {
             "epochs": 15,
-            "batch_size": 32,
+            "batch_size": 64,
             "learning_rate": 1e-4,
             "backbone": 'efficientnet_b3',
             "attribute_loss_weight": 1.0
         },
         "最高精度 (High Accuracy)": {
             "epochs": 30,
-            "batch_size": 32,
+            "batch_size": 64,
             "learning_rate": 5e-5,
             "backbone": 'efficientnet_b4',
             "attribute_loss_weight": 1.0
@@ -351,7 +351,7 @@ def create_config_panel(ANNO_DIR, IMG_DIR, CONFIG_PATH, nvml_available, gpu_name
         'strategy_choice': strategy_choice,
         'anno_dir': anno_dir_input,
         'img_dir': img_dir_input,
-        'num_workers': 0  # Windows 下多进程可能有问题，先用 0
+        'num_workers': 4  # 增加数据加载线程数，提高GPU利用率
     }
     
     return selected_device, selected_gpu_index, training_params 

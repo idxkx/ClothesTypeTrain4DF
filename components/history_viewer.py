@@ -4,6 +4,7 @@ import pandas as pd
 import json
 import uuid
 import time
+import math
 
 from utils.file_utils import load_results, save_results
 from components.report_generator import generate_metadata_for_model
@@ -19,7 +20,7 @@ def display_history():
     show_failed = st.checkbox(
         "显示失败的训练记录", 
         value=st.session_state.show_failed,
-        key="show_failed_checkbox",
+        key="history_viewer_show_failed_checkbox",
         help="勾选此项可显示状态为'失败'或'错误'的训练记录"
     )
     
@@ -39,6 +40,24 @@ def display_history():
 
         best_epoch_info = f"{r.get('best_val_loss', 'N/A'):.4f} @ E{r.get('best_epoch', 'N/A')}" if isinstance(r.get('best_val_loss'), (int, float)) else "N/A"
         
+        # 获取过拟合风险评估
+        evaluation = r.get("evaluation", {})
+        overfitting_risk = evaluation.get("overfitting_risk", "未知")
+        loss_diff = evaluation.get("loss_diff", float('nan'))
+        acc_diff = evaluation.get("accuracy_diff", float('nan'))
+        
+        # 格式化过拟合指标
+        risk_display = overfitting_risk
+        if overfitting_risk == "高":
+            risk_display = f"⚠️ {overfitting_risk}"
+        elif overfitting_risk == "中":
+            risk_display = f"⚡ {overfitting_risk}"
+        elif overfitting_risk == "低":
+            risk_display = f"✅ {overfitting_risk}"
+            
+        # 差异指标显示
+        diff_display = f"损失: {loss_diff:.2f} | 准确率: {acc_diff:.1f}%" if not math.isnan(loss_diff) and not math.isnan(acc_diff) else "N/A"
+        
         # 检查是否存在元数据文件
         metadata_status = "⚠️ 未找到"
         model_path = r.get("best_model_path", "")
@@ -46,9 +65,10 @@ def display_history():
         if model_path and os.path.exists(model_path):
             model_dir = os.path.dirname(model_path)
             model_name = r.get("model_name", "")
-            metadata_file = os.path.join(model_dir, f"{model_name}_metadata.json")
-            if os.path.exists(metadata_file):
-                metadata_status = "✅ 已生成"
+            if model_dir and model_name:  # 确保目录和名称都不为空
+                metadata_file = os.path.join(model_dir, f"{model_name}_metadata.json")
+                if metadata_file and os.path.exists(metadata_file):  # 添加对metadata_file的检查
+                    metadata_status = "✅ 已生成"
         
         display_data.append({
             "完成时间": r.get("end_time_str", "N/A"),
@@ -57,6 +77,8 @@ def display_history():
             "骨干网络": r.get("backbone", "N/A"),
             "轮数": f"{r.get('completed_epochs', 'N/A')}/{r.get('total_epochs', 'N/A')}",
             "最佳验证损失 (轮)": best_epoch_info,
+            "过拟合风险": risk_display,
+            "训练差异": diff_display,
             "状态": r.get("status", "N/A").split('.')[0],  # 取第一句
             "总耗时": r.get("duration_str", "N/A"),
             "元数据": metadata_status,
@@ -177,6 +199,10 @@ def render_action_buttons(row_data):
     model_path = model_info["model_path"]
     original_data = model_info["original_data"]
     
+    # 确保模型路径有效
+    if not model_path or not os.path.exists(model_path):
+        has_metadata = False
+    
     # 获取行索引，确保UI元素的唯一性
     # 使用完成时间作为区分不同记录的标识符
     end_time = row_data.get("完成时间", "")
@@ -259,10 +285,22 @@ def render_action_buttons(row_data):
 def view_model_metadata(model_name, model_path):
     """查看模型元数据"""
     try:
+        if not model_path or not os.path.exists(model_path):
+            st.warning(f"⚠️ 模型文件不存在: {model_path}")
+            return
+            
         model_dir = os.path.dirname(model_path)
+        if not model_dir:
+            st.warning(f"⚠️ 无法获取模型目录")
+            return
+            
+        if not model_name:
+            st.warning(f"⚠️ 模型名称为空")
+            return
+            
         metadata_file = os.path.join(model_dir, f"{model_name}_metadata.json")
         
-        if not os.path.exists(metadata_file):
+        if not metadata_file or not os.path.exists(metadata_file):
             st.warning(f"⚠️ 未找到 {model_name} 的元数据文件 ({metadata_file})")
             return
             
@@ -279,6 +317,10 @@ def view_model_metadata(model_name, model_path):
 
 def show_model_details(model_name, all_results):
     """显示模型详细信息"""
+    if not model_name:
+        st.warning("无法显示详情：模型名称为空")
+        return
+        
     # 查找选中的模型记录
     selected_result = next(
         (r for r in all_results if r.get("model_name") == model_name),

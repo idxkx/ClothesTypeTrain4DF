@@ -126,46 +126,96 @@ st.set_page_config(page_title="模型效果测试", layout="wide")
 st.title("🧪 模型效果测试")
 st.markdown("从训练好的模型中选择一个，上传服装图片，查看识别结果。")
 
-# 设置初始状态，默认为下拉列表选择模式
-if "using_dropdown_selection" not in st.session_state:
-    st.session_state.using_dropdown_selection = True
-
-# --- 加载和选择模型 ---
-all_results = load_results()
-# 筛选出成功的训练运行
-successful_runs = [
-    r for r in all_results
-    if r.get("status") == "已完成" and
-       r.get("functional_test_result") == "成功" and
-       r.get("best_model_path") and
-       os.path.exists(os.path.join(os.path.dirname(__file__), '..', r["best_model_path"])) # 检查文件是否存在
-]
-
-model_options = {"请选择模型": None}
-if successful_runs:
-    for run in sorted(successful_runs, key=lambda x: x.get("end_time", 0), reverse=True):
-        option_label = f"{run.get('model_name', '未知模型')} (完成于 {run.get('end_time_str', '未知时间')}, Backbone: {run.get('backbone', '未知')})"
-        model_options[option_label] = {
-            "path": os.path.join(os.path.dirname(__file__), '..', run["best_model_path"]), 
-            "backbone": run.get("backbone"),
-            # 使用默认路径作为备选
-            "anno_dir": run.get("anno_dir", DEFAULT_ANNO_DIR) 
-        }
-else:
-    st.warning("没有找到符合条件的训练好的模型记录。请先在主页面完成模型训练。")
-
-# 简化UI，只使用下拉列表选择模型
-st.selectbox(
-    "选择一个训练好的模型:",
-    list(model_options.keys()),
-    key="eval_model_selection"
+# 模型选择方式
+model_selection_method = st.radio(
+    "选择模型方式:",
+    ["从下拉列表选择", "自定义模型路径"],
+    key="model_selection_method"
 )
 
-selected_model_info = model_options.get(st.session_state.eval_model_selection)
+# --- 加载和选择模型 ---
+if model_selection_method == "从下拉列表选择":
+    all_results = load_results()
+    # 筛选出成功的训练运行
+    successful_runs = [
+        r for r in all_results
+        if r.get("status") == "已完成" and
+           r.get("functional_test_result") == "成功" and
+           r.get("best_model_path") and
+           os.path.exists(os.path.join(os.path.dirname(__file__), '..', r["best_model_path"])) # 检查文件是否存在
+    ]
 
-# 如果选择了模型，显示模型信息
-if selected_model_info:
-    st.success(f"已选择模型，骨干网络: {selected_model_info.get('backbone', '未知')}")
+    model_options = {"请选择模型": None}
+    if successful_runs:
+        for run in sorted(successful_runs, key=lambda x: x.get("end_time", 0), reverse=True):
+            option_label = f"{run.get('model_name', '未知模型')} (完成于 {run.get('end_time_str', '未知时间')}, Backbone: {run.get('backbone', '未知')})"
+            model_options[option_label] = {
+                "path": os.path.join(os.path.dirname(__file__), '..', run["best_model_path"]), 
+                "backbone": run.get("backbone"),
+                # 使用默认路径作为备选
+                "anno_dir": run.get("anno_dir", DEFAULT_ANNO_DIR) 
+            }
+    else:
+        st.warning("没有找到符合条件的训练好的模型记录。请先在主页面完成模型训练或选择自定义模型路径。")
+
+    selected_model = st.selectbox(
+        "选择训练好的模型:",
+        list(model_options.keys()),
+        key="eval_model_selection"
+    )
+    
+    selected_model_info = model_options.get(selected_model)
+    
+    # 如果选择了模型，显示模型信息
+    if selected_model_info:
+        st.success(f"已选择模型，骨干网络: {selected_model_info.get('backbone', '未知')}")
+        
+else:  # 自定义模型路径
+    model_dir = st.text_input(
+        "输入模型目录路径 (例如：models/MD_RESNET18_5_64_50E04_DEMO):",
+        key="custom_model_dir"
+    )
+    
+    if model_dir:
+        full_model_dir = os.path.join(os.path.dirname(__file__), '..', model_dir)
+        
+        if os.path.isdir(full_model_dir):
+            # 列出目录中的.pth文件
+            model_files = [f for f in os.listdir(full_model_dir) if f.endswith('.pth')]
+            
+            if model_files:
+                selected_model_file = st.selectbox(
+                    "选择模型文件:",
+                    model_files,
+                    key="custom_model_file"
+                )
+                
+                if selected_model_file:
+                    # 选择骨干网络
+                    backbone = st.selectbox(
+                        "选择骨干网络:",
+                        ["resnet18", "resnet34", "resnet50", "efficientnet_b0", "efficientnet_b3"],
+                        key="custom_model_backbone"
+                    )
+                    
+                    # 创建模型信息字典
+                    selected_model_info = {
+                        "path": os.path.join(full_model_dir, selected_model_file),
+                        "backbone": backbone,
+                        "anno_dir": DEFAULT_ANNO_DIR
+                    }
+                    
+                    st.success(f"已选择模型: {selected_model_info['path']}")
+                else:
+                    selected_model_info = None
+            else:
+                st.error(f"在目录 {full_model_dir} 中没有找到 .pth 模型文件")
+                selected_model_info = None
+        else:
+            st.error(f"目录 {full_model_dir} 不存在")
+            selected_model_info = None
+    else:
+        selected_model_info = None
 
 # --- 图片上传 ---
 uploaded_file = st.file_uploader(
@@ -187,9 +237,11 @@ if uploaded_file is not None:
         uploaded_file = None # 阻止后续处理
 
 if st.button("🚀 开始识别！", key="eval_start_recognition"):
-    # 简化逻辑，只处理下拉列表选择的情况
     if not selected_model_info:
-        st.error("请先从下拉列表中选择一个模型。")
+        if model_selection_method == "从下拉列表选择":
+            st.error("请先从下拉列表中选择一个模型。")
+        else:
+            st.error("请先指定有效的模型路径和文件。")
     elif not uploaded_file:
         st.error("请先上传一张图片。")
     else:

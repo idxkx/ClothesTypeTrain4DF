@@ -365,35 +365,51 @@ def _clean_old_model_files(model_save_path, model_name):
     # 如果有时间戳格式 (_MMDD_HHMM)，去除它用于匹配
     base_model_name = re.sub(r'_\d{4}_\d{4}$', '', model_name)
     
-    # 匹配可能的名称格式
-    patterns = [
-        f"best_model_{model_name}_epoch",  # 完整匹配
-        f"best_model_{base_model_name}_epoch",  # 基础名称匹配
-        f"best_model_{model_name[:30]}_epoch",  # 可能被截断的名称
-    ]
+    # 创建更强大的正则表达式模式进行匹配
+    # 这允许匹配完整模型名或不带时间戳的基础名称
+    pattern = rf"best_model_(({re.escape(model_name)})|({re.escape(base_model_name)}))(_\d+)?_epoch\d+\.pth"
     
     deleted_count = 0
     for old_file in os.listdir(model_save_path):
-        for pattern in patterns:
-            if old_file.startswith(pattern) and old_file.endswith(".pth"):
-                try:
-                    os.remove(os.path.join(model_save_path, old_file))
-                    append_log(f"已删除旧的最佳模型: {old_file}")
-                    deleted_count += 1
-                    break  # 一旦匹配成功并删除，就跳出内层循环
-                except OSError as e:
-                    append_log(f"无法删除旧模型 {old_file}: {e}")
+        if re.match(pattern, old_file):
+            try:
+                os.remove(os.path.join(model_save_path, old_file))
+                append_log(f"已删除旧的最佳模型: {old_file}")
+                deleted_count += 1
+            except OSError as e:
+                append_log(f"无法删除旧模型 {old_file}: {e}")
     
     append_log(f"清理完成，共删除 {deleted_count} 个旧模型文件")
 
 def _save_best_model(trainer, model_name, epoch, val_loss):
     """保存最佳模型"""
-    # 保留完整模型名称，不截断，确保一致性
-    save_filename = os.path.join(trainer.model_save_path, f"best_model_{model_name}_epoch{epoch+1}.pth")
+    # 首先检查保存路径是否有效
+    if not trainer.model_save_path:
+        append_log("错误：模型保存路径无效，无法保存模型")
+        return None
+        
+    # 为避免模型名称重复，添加当前时间（MMDD_HHMM格式）
+    now = datetime.now()
+    time_suffix = ""
+    
+    # 检查模型名称是否已包含时间戳，如果没有，添加时间戳
+    if not re.search(r'_\d{4}_\d{4}$', model_name):
+        time_suffix = f"_{now.strftime('%m%d_%H%M')}"
+    
+    # 构建完整的文件名，包括模型名和时间戳(如果需要)
+    filename = f"best_model_{model_name}{time_suffix}_epoch{epoch+1}.pth"
+    save_filename = os.path.join(trainer.model_save_path, filename)
+    
     try:
         torch.save(trainer.model.state_dict(), save_filename)
         append_log(f"** 新的最佳模型已保存到: {save_filename} (Val Loss: {val_loss:.4f}) **")
-        return save_filename
+        
+        # 确认文件是否已成功创建
+        if os.path.exists(save_filename):
+            return save_filename
+        else:
+            append_log("警告：模型文件似乎未成功创建，路径可能无效")
+            return None
     except Exception as e:
         append_log(f"错误：保存模型时出错: {e}")
         return None
@@ -428,15 +444,24 @@ def _finalize_training(training_success, history_df, best_val_loss, model_save_d
     # 生成诊断报告
     if history_df is not None and not history_df.empty:
         from components.report_generator import generate_diagnostic_report
-        diagnostic_report = generate_diagnostic_report(history_df, best_val_loss, training_params['epochs'])
+        diagnostic_report, evaluation_data = generate_diagnostic_report(history_df, best_val_loss, training_params['epochs'])
         ui_components['diagnostic'].markdown(diagnostic_report)
         append_log("\n--- 诊断报告已生成 ---")
+        
+        # 保存诊断报告文本和结构化评估数据
         current_run_result["diagnostic_summary"] = diagnostic_report
+        current_run_result["evaluation"] = evaluation_data  # 添加结构化评估数据
     else:
         current_run_result["diagnostic_summary"] = "无训练历史数据"
+        current_run_result["evaluation"] = {
+            "overfitting_risk": "未知",
+            "loss_diff": float('nan'),
+            "accuracy_diff": float('nan'),
+            "convergence_status": "未知"
+        }
     
     # 执行功能测试
-    if training_success and current_run_result["best_model_path"] is not None:
+    if training_success and current_run_result.get("best_model_path") and os.path.exists(current_run_result["best_model_path"]):
         from components.report_generator import run_functional_test
         model_config = {
             'num_categories': 50,  # 假设类别数为50
@@ -472,10 +497,14 @@ def _finalize_training(training_success, history_df, best_val_loss, model_save_d
         ui_components['functional_test'].warning("训练未成功完成，跳过功能测试。")
         append_log("训练未成功完成，跳过功能测试。")
         current_run_result["functional_test_result"] = "跳过 (训练失败)"
-    else:
-        ui_components['functional_test'].warning("未找到有效的最佳模型文件，跳过功能测试。")
-        append_log("未找到有效的最佳模型文件，跳过功能测试。")
-        current_run_result["functional_test_result"] = "跳过 (无模型)"
+    elif not current_run_result.get("best_model_path"):
+        ui_components['functional_test'].warning("未找到有效的最佳模型路径，跳过功能测试。")
+        append_log("未找到有效的最佳模型路径，跳过功能测试。")
+        current_run_result["functional_test_result"] = "跳过 (无模型路径)"
+    elif not os.path.exists(current_run_result["best_model_path"]):
+        ui_components['functional_test'].warning("模型文件不存在，跳过功能测试。")
+        append_log(f"模型文件不存在: {current_run_result['best_model_path']}，跳过功能测试。")
+        current_run_result["functional_test_result"] = "跳过 (模型文件不存在)"
     
     # 保存当前运行结果
     all_results = load_results(results_file)
