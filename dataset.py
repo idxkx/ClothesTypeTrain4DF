@@ -33,9 +33,11 @@ ANNO_DIR = safe_path(config.get('anno_dir', None))
 IMG_DIR = safe_path(config.get('img_dir', None))
 
 if not ANNO_DIR or not os.path.exists(ANNO_DIR):
-    raise FileNotFoundError(f'标注文件目录不存在或未配置，请检查 config.json 中的 "anno_dir" 路径: {ANNO_DIR} (当前系统: {'Windows' if IS_WINDOWS else 'Linux'})')
+    system_type = "Windows" if IS_WINDOWS else "Linux"
+    raise FileNotFoundError(f'标注文件目录不存在或未配置，请检查 config.json 中的 "anno_dir" 路径: {ANNO_DIR} (当前系统: {system_type})')
 if not IMG_DIR or not os.path.exists(IMG_DIR):
-    raise FileNotFoundError(f'高分辨率图片目录不存在或未配置，请检查 config.json 中的 "img_dir" 路径: {IMG_DIR} (当前系统: {'Windows' if IS_WINDOWS else 'Linux'})')
+    system_type = "Windows" if IS_WINDOWS else "Linux"
+    raise FileNotFoundError(f'高分辨率图片目录不存在或未配置，请检查 config.json 中的 "img_dir" 路径: {IMG_DIR} (当前系统: {system_type})')
 
 # --- 配置日志记录 ---
 # 1. 配置基本日志记录器 (INFO 及以上级别，输出到控制台)

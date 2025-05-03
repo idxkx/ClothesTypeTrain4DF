@@ -187,7 +187,11 @@ with tabs[0]:
     st.header("上传并标注新图片")
     
     # 文件上传
-    uploaded_file = st.file_uploader("上传服装图片:", type=["jpg", "jpeg", "png"], key="label_file_uploader")
+    uploaded_file = st.file_uploader(
+        "上传服装图片:",
+        type=["jpg", "jpeg", "png"],
+        key="label_new_image_upload"
+    )
     
     if uploaded_file is not None:
         try:
@@ -215,11 +219,10 @@ with tabs[0]:
                 for cat_id, cat_name in st.session_state.original_categories.items():
                     category_options[cat_name] = cat_id
                 
-                # 类别标注
+                # 类别选择
                 selected_category = st.selectbox(
                     "选择服装类别:",
-                    options=list(category_options.keys()),
-                    index=0 if list(category_options.keys()) else None,
+                    options=list(all_categories.keys()),
                     key="label_category_select"
                 )
                 
@@ -230,8 +233,7 @@ with tabs[0]:
                 all_attributes.update(st.session_state.original_attributes)
                 all_attributes.update(st.session_state.custom_attributes)
                 
-                # 属性标注 (多选)
-                st.write("选择服装属性 (可多选):")
+                # 属性选择
                 selected_attributes = {}
                 
                 # 按类型对属性分组显示（这里简化为3组，实际可根据需要细分）
@@ -264,13 +266,19 @@ with tabs[0]:
                         cols = st.columns(3)
                         for j, (attr_id, attr_name) in enumerate(attrs):
                             with cols[j % 3]:
-                                selected_attributes[attr_id] = st.checkbox(attr_name, key=f"attr_{attr_id}")
+                                selected_attributes[attr_id] = st.checkbox(
+                                    attr_name,
+                                    key=f"label_attr_{attr_id}"
+                                )
                 
-                # 添加备注
-                notes = st.text_area("标注备注:", key="label_notes")
+                # 标注备注
+                notes = st.text_area(
+                    "标注备注:",
+                    key="label_notes_input"
+                )
                 
-                # 保存标注按钮
-                if st.button("保存标注", key="save_label_btn"):
+                # 保存按钮
+                if st.button("保存标注", key="label_save_btn"):
                     if selected_category_id:
                         # 生成唯一ID
                         image_id = str(uuid.uuid4())
@@ -292,7 +300,7 @@ with tabs[0]:
                         if save_image(image, image_id) and save_annotation(annotation):
                             st.success("标注数据保存成功!")
                             # 清空上传
-                            st.session_state.label_file_uploader = None
+                            st.session_state.label_new_image_upload = None
                             # 重新加载页面
                             st.rerun()
                     else:
@@ -321,17 +329,24 @@ with tabs[1]:
         else:
             st.info("暂无自定义类别，使用下方表单添加")
         
-        # 添加新类别表单
+        # 添加新类别
         st.write("添加新类别:")
         # 生成一个新的类别ID，避免与原始类别冲突
         next_id = 1001
         while str(next_id) in st.session_state.custom_categories:
             next_id += 1
             
-        new_cat_id = st.text_input("类别ID (建议使用1000以上的值):", value=str(next_id), key="new_cat_id")
-        new_cat_name = st.text_input("类别名称 (例如: Qipao/旗袍):", key="new_cat_name")
+        new_cat_id = st.text_input(
+            "类别ID (建议使用1000以上的值):",
+            value=str(next_id),
+            key="new_category_id_input"
+        )
+        new_cat_name = st.text_input(
+            "类别名称 (例如: Qipao/旗袍):",
+            key="new_category_name_input"
+        )
         
-        if st.button("添加类别", key="add_cat_btn"):
+        if st.button("添加类别", key="add_category_btn"):
             if new_cat_id and new_cat_name:
                 # 检查ID是否已存在
                 if new_cat_id in st.session_state.original_categories or new_cat_id in st.session_state.custom_categories:
@@ -358,17 +373,24 @@ with tabs[1]:
         else:
             st.info("暂无自定义属性，使用下方表单添加")
         
-        # 添加新属性表单
+        # 添加新属性
         st.write("添加新属性:")
         # 生成一个新的属性ID，避免与原始属性冲突
         next_attr_id = 1001
         while str(next_attr_id) in st.session_state.custom_attributes:
             next_attr_id += 1
             
-        new_attr_id = st.text_input("属性ID (建议使用1000以上的值):", value=str(next_attr_id), key="new_attr_id")
-        new_attr_name = st.text_input("属性名称 (例如: mandarin_collar/立领):", key="new_attr_name")
+        new_attr_id = st.text_input(
+            "属性ID (建议使用1000以上的值):",
+            value=str(next_attr_id),
+            key="new_attribute_id_input"
+        )
+        new_attr_name = st.text_input(
+            "属性名称 (例如: mandarin_collar/立领):",
+            key="new_attribute_name_input"
+        )
         
-        if st.button("添加属性", key="add_attr_btn"):
+        if st.button("添加属性", key="add_attribute_btn"):
             if new_attr_id and new_attr_name:
                 # 检查ID是否已存在
                 if new_attr_id in st.session_state.original_attributes or new_attr_id in st.session_state.custom_attributes:
@@ -409,7 +431,11 @@ with tabs[2]:
         
         # 查看和编辑单个标注
         st.subheader("查看/编辑标注")
-        selected_id = st.selectbox("选择要查看的标注:", options=[item["id"] for item in labeled_data])
+        selected_id = st.selectbox(
+            "选择要查看的标注:",
+            options=[item["id"] for item in labeled_data],
+            key="view_label_select"
+        )
         
         if selected_id:
             selected_item = next((item for item in labeled_data if item["id"] == selected_id), None)
@@ -479,8 +505,8 @@ with tabs[3]:
         
         export_format = st.radio(
             "选择导出格式:",
-            options=["DeepFashion格式", "CSV表格格式", "JSON格式"],
-            index=0
+            ["DeepFashion格式", "COCO格式", "YOLO格式"],
+            key="export_format_select"
         )
         
         if st.button("导出数据", key="export_data_btn"):
@@ -630,70 +656,45 @@ with tabs[3]:
                     
                     st.success(f"数据已成功导出为DeepFashion格式，完全符合Anno_fine目录结构，保存在: {export_dir}")
                 
-                elif export_format == "CSV表格格式":
-                    # 导出为CSV格式
-                    export_file = os.path.join(export_dir, "labeled_data.csv")
+                elif export_format == "COCO格式":
+                    # 导出为COCO格式
+                    export_file = os.path.join(export_dir, "labeled_data.coco")
                     
-                    # 合并类别和属性信息
-                    all_categories = {}
-                    all_categories.update(st.session_state.original_categories)
-                    all_categories.update(st.session_state.custom_categories)
-                    
-                    all_attributes = {}
-                    all_attributes.update(st.session_state.original_attributes)
-                    all_attributes.update(st.session_state.custom_attributes)
-                    
-                    # 创建CSV数据
-                    csv_data = []
-                    for item in labeled_data:
-                        row = {
-                            "ID": item["id"],
-                            "Image_Path": f"images/{item['id']}.jpg",
-                            "Category_ID": item["category_id"],
-                            "Category_Name": all_categories.get(str(item["category_id"]), "Unknown"),
-                            "Timestamp": item["timestamp"],
-                            "Notes": item.get("notes", "")
-                        }
-                        
-                        # 添加属性列
-                        for attr_id, attr_name in all_attributes.items():
-                            has_attr = 1 if str(attr_id) in [str(a) for a in item["attributes"]] else 0
-                            row[f"Attr_{attr_id}_{attr_name}"] = has_attr
-                            
-                        csv_data.append(row)
-                    
-                    # 写入CSV
-                    df = pd.DataFrame(csv_data)
-                    df.to_csv(export_file, index=False)
-                    
-                    # 复制图片
-                    for item in labeled_data:
-                        src_img = os.path.join(LABEL_DATA_DIR, "images", f"{item['id']}.jpg")
-                        dst_img = os.path.join(export_dir, "images", f"{item['id']}.jpg")
-                        if os.path.exists(src_img):
-                            os.makedirs(os.path.join(export_dir, "images"), exist_ok=True)
-                            shutil.copy2(src_img, dst_img)
-                    
-                    st.success(f"数据已成功导出为CSV格式，保存在: {export_file}")
-                
-                else:  # JSON格式
-                    # 导出为JSON格式
-                    export_file = os.path.join(export_dir, "labeled_data.json")
-                    
-                    # 创建包含更多详细信息的JSON
-                    json_data = {
-                        "metadata": {
-                            "export_time": export_time,
-                            "total_items": len(labeled_data),
-                            "categories": st.session_state.custom_categories,
-                            "attributes": st.session_state.custom_attributes
-                        },
-                        "items": labeled_data
+                    # 创建COCO格式的标注文件
+                    coco_data = {
+                        "images": [
+                            {
+                                "id": item["id"],
+                                "file_name": f"images/{item['id']}.jpg",
+                                "width": image.width,
+                                "height": image.height
+                            }
+                            for item, image in zip(labeled_data, [Image.open(os.path.join(LABEL_DATA_DIR, "images", f"{item['id']}.jpg")) for item in labeled_data])
+                        ],
+                        "categories": [
+                            {
+                                "id": cat_id,
+                                "name": cat_name,
+                                "supercategory": "clothing"
+                            }
+                            for cat_id, cat_name in st.session_state.custom_categories.items()
+                        ],
+                        "annotations": [
+                            {
+                                "id": item["id"],
+                                "image_id": item["id"],
+                                "category_id": item["category_id"],
+                                "bbox": [0, 0, image.width, image.height],
+                                "area": image.width * image.height,
+                                "iscrowd": 0
+                            }
+                            for item, image in zip(labeled_data, [Image.open(os.path.join(LABEL_DATA_DIR, "images", f"{item['id']}.jpg")) for item in labeled_data])
+                        ]
                     }
                     
-                    # 写入JSON
+                    # 写入COCO标注文件
                     with open(export_file, 'w', encoding='utf-8') as f:
-                        json.dump(json_data, f, ensure_ascii=False, indent=2)
+                        json.dump(coco_data, f, ensure_ascii=False, indent=2)
                     
                     # 复制图片
                     for item in labeled_data:
@@ -703,7 +704,30 @@ with tabs[3]:
                             os.makedirs(os.path.join(export_dir, "images"), exist_ok=True)
                             shutil.copy2(src_img, dst_img)
                     
-                    st.success(f"数据已成功导出为JSON格式，保存在: {export_file}")
+                    st.success(f"数据已成功导出为COCO格式，保存在: {export_file}")
+                
+                else:  # YOLO格式
+                    # 导出为YOLO格式
+                    export_file = os.path.join(export_dir, "labeled_data.yolo")
+                    
+                    # 创建YOLO格式的标注文件
+                    yolo_data = []
+                    for item, image in zip(labeled_data, [Image.open(os.path.join(LABEL_DATA_DIR, "images", f"{item['id']}.jpg")) for item in labeled_data]):
+                        yolo_data.append(f"{item['category_id']} {item['attributes'][0] / image.width} {item['attributes'][1] / image.height} {(item['attributes'][2] - item['attributes'][0]) / image.width} {(item['attributes'][3] - item['attributes'][1]) / image.height}")
+                    
+                    # 写入YOLO标注文件
+                    with open(export_file, 'w', encoding='utf-8') as f:
+                        f.write("\n".join(yolo_data))
+                    
+                    # 复制图片
+                    for item in labeled_data:
+                        src_img = os.path.join(LABEL_DATA_DIR, "images", f"{item['id']}.jpg")
+                        dst_img = os.path.join(export_dir, "images", f"{item['id']}.jpg")
+                        if os.path.exists(src_img):
+                            os.makedirs(os.path.join(export_dir, "images"), exist_ok=True)
+                            shutil.copy2(src_img, dst_img)
+                    
+                    st.success(f"数据已成功导出为YOLO格式，保存在: {export_file}")
                 
                 # 显示下载链接
                 st.write("请手动复制以下路径访问导出文件:")
@@ -716,7 +740,7 @@ with tabs[3]:
         st.subheader("重新训练模型")
         st.write("导出数据后，您可以使用这些数据重新训练模型，提升对新类别（如旗袍）的识别能力。")
         
-        if st.button("跳转到训练页面", key="goto_train_btn"):
+        if st.button("跳转到训练页面", key="goto_train_page_btn"):
             # 跳转到训练页面的URL
             js = f"""
             <script>

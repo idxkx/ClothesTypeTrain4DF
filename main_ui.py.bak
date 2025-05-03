@@ -1,0 +1,306 @@
+# Placeholder for Streamlit UI code 
+
+import streamlit as st
+import torch
+import os
+import time
+import pandas as pd
+import math
+import traceback
+import json
+import asyncio
+import nest_asyncio
+import platform
+import subprocess
+import uuid
+from datetime import datetime, timedelta
+from torchvision import transforms
+
+# --- 组件导入 ---
+from components.config_panel import create_config_panel
+from components.training_panel import start_training_process, update_training_ui
+from components.history_viewer import display_history, render_action_buttons
+from components.gpu_monitor import update_gpu_info, initialize_gpu
+from components.metadata_manager import display_metadata_viewer, display_metadata_creator
+from components.report_generator import batch_generate_metadata
+from utils.state_manager import initialize_session_state
+from utils.file_utils import safe_path, load_results, save_results
+from utils.time_utils import format_time_delta
+from utils.path_manager import load_config_paths
+
+# --- 环境检测 ---
+IS_WINDOWS = platform.system().lower().startswith('win')
+IS_LINUX = platform.system().lower() == 'linux'
+
+# --- 事件循环处理 ---
+try:
+    if IS_LINUX:
+        nest_asyncio.apply()
+    loop = asyncio.get_event_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+# --- 配置文件常量 ---
+RESULTS_FILE = "training_results.json"
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config.json')
+
+# --- GPU初始化 ---
+nvml_available, pynvml, gpu_names = initialize_gpu()
+
+# --- 路径配置 ---
+ANNO_DIR, IMG_DIR = load_config_paths(CONFIG_PATH)
+
+# --- 模型和训练器导入 ---
+try:
+    from model import ClothesModel
+    from trainer import Trainer
+    from dataset import DeepFashionDataset
+except ImportError as e:
+    st.error(f"错误：无法导入必要的模块。请确保 model.py, trainer.py, dataset.py 与 main_ui.py 在同一目录下。错误: {e}")
+    st.stop()
+
+def main():
+    """主应用入口函数"""
+    # --- 页面配置 ---
+    st.set_page_config(page_title="喵搭服装识别训练场", layout="wide")
+    st.title("👕喵搭👗服装识别模型训练场")
+    st.markdown("--- ")
+    
+    # --- 初始化会话状态 ---
+    initialize_session_state()
+    
+    # --- 创建侧边栏配置面板 ---
+    selected_device, selected_gpu_index, training_params = create_config_panel(
+        ANNO_DIR, IMG_DIR, CONFIG_PATH, nvml_available, gpu_names)
+    
+    # --- 创建主界面 ---
+    col_main_1, col_main_2 = st.columns([2, 1])  # 状态/图表区 vs 日志区
+    
+    with col_main_1:
+        st.subheader("📊 训练状态与指标")
+        status_placeholder = st.empty()
+        overall_progress_bar = st.progress(0.0)
+        epoch_info_placeholder = st.empty()
+        time_info_placeholder = st.empty()
+        diagnostic_report_placeholder = st.empty()
+        functional_test_placeholder = st.empty()
+        loss_chart_placeholder = st.empty()
+        acc_chart_placeholder = st.empty()
+    
+    with col_main_2:
+        st.subheader("📜 训练日志")
+        log_placeholder = st.empty()
+        log_placeholder.code("", language='log')
+    
+    # --- 创建GPU监控区域 ---
+    st.sidebar.markdown("--- ")
+    st.sidebar.subheader("📈 GPU 监控")
+    gpu_info_placeholder = st.sidebar.empty()
+    gpu_util_chart_placeholder = st.sidebar.empty()
+    gpu_mem_chart_placeholder = st.sidebar.empty()
+    
+    # 更新GPU监控
+    if selected_gpu_index is not None:
+        gpu_chart_placeholders = (gpu_util_chart_placeholder, gpu_mem_chart_placeholder)
+        update_gpu_info(selected_gpu_index, gpu_info_placeholder, gpu_chart_placeholders)
+    
+    # --- 训练控制 ---
+    train_button_col, stop_button_col = st.sidebar.columns(2)
+    start_training = train_button_col.button("🚀 开始训练！")
+    stop_training = stop_button_col.button("⏹️ 停止训练")
+    
+    if stop_training:
+        st.session_state.stop_requested = True
+        st.sidebar.warning("收到停止请求...将在当前轮次结束后尝试停止。")
+    
+    # --- 触发训练过程 ---
+    if start_training:
+        ui_components = {
+            'status': status_placeholder,
+            'progress': overall_progress_bar,
+            'epoch_info': epoch_info_placeholder,
+            'time_info': time_info_placeholder,
+            'diagnostic': diagnostic_report_placeholder,
+            'functional_test': functional_test_placeholder,
+            'loss_chart': loss_chart_placeholder,
+            'acc_chart': acc_chart_placeholder,
+            'log': log_placeholder,
+            'gpu_info': gpu_info_placeholder,
+            'gpu_charts': (gpu_util_chart_placeholder, gpu_mem_chart_placeholder)
+        }
+        
+        start_training_process(
+            training_params,
+            selected_device,
+            selected_gpu_index,
+            ui_components,
+            ANNO_DIR,
+            IMG_DIR,
+            RESULTS_FILE
+        )
+    elif not st.session_state.get('log_messages'):
+        status_placeholder.info("请在左侧设置参数并点击 '开始训练！' 按钮。")
+        log_placeholder.code("尚未开始训练...", language='log')
+    
+    # --- 历史记录区域 ---
+    st.markdown("--- ")
+    st.subheader("📜 历史训练对比")
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        if st.button("🔄 批量生成缺失的元数据", key="batch_generate_metadata_btn"):
+            with st.spinner("正在生成元数据..."):
+                results = batch_generate_metadata()
+                st.write("生成结果:")
+                for model_name, success, message in results:
+                    if success:
+                        st.success(f"✅ {model_name}: {message}")
+                    else:
+                        st.warning(f"⚠️ {model_name}: {message}")
+            st.rerun()  # 刷新显示
+    
+    with col2:
+        st.session_state.show_failed = st.checkbox(
+            "显示失败的训练",
+            value=True,
+            key="show_failed_checkbox",
+            help="勾选显示训练失败的记录"
+        )
+    
+    # 显示历史记录
+    display_history()
+    
+    # --- 元数据查看区域 ---
+    with st.expander("🔍 查看模型元数据", expanded=False):
+        display_metadata_viewer()
+    
+    # --- 手动创建元数据区域 ---
+    with st.expander("🛠️ 手动创建元数据", expanded=False):
+        display_metadata_creator()
+
+def display_metadata_viewer():
+    """显示元数据查看界面"""
+    st.markdown("""
+    此区域可以查看已训练模型的元数据文件，包含模型架构、类别名称、特征名称等信息。
+    """)
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        all_results = load_results()
+        model_names = [r.get("model_name", "未命名模型") for r in all_results]
+        selected_model = st.selectbox(
+            "选择要查看元数据的模型",
+            options=model_names,
+            index=0 if model_names else None,
+            key="metadata_model_select",
+            help="选择一个模型来查看其元数据内容"
+        )
+    
+    with col2:
+        if st.button("查看元数据", key="view_metadata_btn"):
+            display_model_metadata(selected_model)
+
+def display_metadata_creator():
+    """显示元数据创建界面"""
+    st.markdown("""
+    此功能允许为已训练的模型手动创建元数据文件，适用于元数据丢失或未自动生成的情况。
+    """)
+    
+    all_results = load_results()
+    model_names = [r.get("model_name", "未命名模型") for r in all_results]
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        metadata_model = st.selectbox(
+            "选择要创建元数据的模型",
+            options=model_names,
+            index=0 if model_names else None,
+            key="create_metadata_model_select",
+            help="选择一个模型来创建或重新生成其元数据文件"
+        )
+    
+    if metadata_model:
+        create_metadata_form(metadata_model, all_results)
+
+def create_metadata_form(model_name, all_results):
+    """为指定模型创建元数据表单"""
+    model_results = [r for r in all_results if r.get("model_name") == model_name]
+    if model_results:
+        model_result = model_results[0]
+        backbone = model_result.get("backbone", "unknown")
+        
+        st.subheader("基本信息")
+        version = st.text_input("版本", "1.0.0", key="metadata_version")
+        description = st.text_input("描述", f"基于{backbone}的服装分类模型", key="metadata_description")
+        trained_by = st.text_input("训练者", "喵搭服装识别训练平台", key="metadata_trained_by")
+        date_created = st.date_input("创建日期", datetime.now(), key="metadata_date").strftime("%Y-%m-%d")
+        
+        st.subheader("模型配置")
+        st.markdown(f"架构: **{backbone}**")
+        input_shape = st.text_input("输入形状 (逗号分隔，如3,224,224)", "3,224,224", key="metadata_input_shape")
+        
+        st.subheader("类别与特征")
+        st.markdown("### 类别名称")
+        st.markdown("每行输入一个类别名称，如为空将使用默认名称")
+        default_class_names = (
+            "T恤\n衬衫\n卫衣\n毛衣\n西装\n夹克\n羽绒服\n风衣\n"
+            "牛仔裤\n休闲裤\n西裤\n短裤\n运动裤\n连衣裙\n半身裙\n"
+            "旗袍\n礼服\n运动鞋\n皮鞋\n高跟鞋\n靴子\n凉鞋\n拖鞋\n"
+            "帽子\n围巾\n领带\n手套\n袜子\n腰带\n眼镜\n手表\n"
+            "项链\n手链\n耳环\n戒指\n包包\n背包\n手提包\n钱包\n行李箱"
+        )
+        class_names_text = st.text_area("类别名称列表", default_class_names, height=200, key="metadata_class_names")
+        
+        st.markdown("### 特征名称")
+        st.markdown("每行输入一个特征名称，如为空将使用默认名称")
+        default_feature_names = (
+            "颜色\n材质\n样式\n花纹\n季节\n正式度\n领型\n袖长\n"
+            "长度\n裤型\n鞋型\n高度\n闭合方式"
+        )
+        feature_names_text = st.text_area("特征名称列表", default_feature_names, height=150, key="metadata_feature_names")
+        
+        if st.button("创建元数据文件", key="create_metadata_file_btn"):
+            # 调用元数据创建函数
+            # 注意：这里需要实现create_metadata_file函数
+            pass
+    else:
+        st.warning(f"找不到模型 {model_name} 的训练记录")
+
+def display_model_metadata(model_name):
+    """显示指定模型的元数据"""
+    if not model_name:
+        st.info("请先选择一个模型")
+        return
+        
+    # 查找选定模型的记录
+    model_results = [r for r in load_results() if r.get("model_name") == model_name]
+    if not model_results:
+        st.warning(f"⚠️ 找不到 {model_name} 的训练记录")
+        return
+        
+    model_result = model_results[0]
+    model_path = model_result.get("best_model_path", "")
+    
+    if not model_path or not os.path.exists(model_path):
+        st.warning(f"⚠️ 找不到 {model_name} 的模型文件")
+        return
+        
+    model_dir = os.path.dirname(model_path)
+    metadata_file = os.path.join(model_dir, f"{model_name}_metadata.json")
+    
+    if not os.path.exists(metadata_file):
+        st.warning(f"⚠️ 未找到 {model_name} 的元数据文件 ({metadata_file})")
+        return
+        
+    try:
+        with open(metadata_file, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        st.json(metadata)
+        st.success(f"✅ 已成功加载 {model_name} 的元数据")
+    except Exception as e:
+        st.error(f"读取元数据时发生错误: {e}")
+
+if __name__ == "__main__":
+    main()

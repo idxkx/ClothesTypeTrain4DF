@@ -158,10 +158,10 @@ else:
 st.selectbox(
     "选择一个训练好的模型:",
     list(model_options.keys()),
-    key="selected_model_dropdown"
+    key="eval_model_selection"
 )
 
-selected_model_info = model_options.get(st.session_state.selected_model_dropdown)
+selected_model_info = model_options.get(st.session_state.eval_model_selection)
 
 # 如果选择了模型，显示模型信息
 if selected_model_info:
@@ -170,7 +170,8 @@ if selected_model_info:
 # --- 图片上传 ---
 uploaded_file = st.file_uploader(
     "上传一张服装图片:",
-    type=["jpg", "jpeg", "png"]
+    type=["jpg", "jpeg", "png"],
+    key="eval_image_upload"
 )
 
 # --- 识别按钮和结果显示 ---
@@ -185,7 +186,7 @@ if uploaded_file is not None:
         st.error(f"无法加载图片: {e}")
         uploaded_file = None # 阻止后续处理
 
-if st.button("🚀 开始识别！"):
+if st.button("🚀 开始识别！", key="eval_start_recognition"):
     # 简化逻辑，只处理下拉列表选择的情况
     if not selected_model_info:
         st.error("请先从下拉列表中选择一个模型。")
@@ -343,7 +344,14 @@ if st.button("🚀 开始识别！"):
                             
                             # 根据阈值筛选属性（默认0.5，但这里显示所有）
                             # st.slider可以让用户调整筛选阈值
-                            threshold = st.slider("属性置信度阈值", min_value=0.0, max_value=1.0, value=0.3, step=0.05)
+                            threshold = st.slider(
+                                "属性置信度阈值",
+                                min_value=0.0,
+                                max_value=1.0,
+                                value=0.3,
+                                step=0.05,
+                                key="eval_confidence_threshold"
+                            )
                             filtered_attrs = [attr for attr in attr_data if attr['probability'] >= threshold]
                             
                             if filtered_attrs:

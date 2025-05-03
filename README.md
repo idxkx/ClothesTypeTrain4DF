@@ -90,8 +90,42 @@ ClothesTypeDemo/
                 "img_dir": "/你的/img_highres/绝对路径"
               }
               ```
-            - 代码会自动读取该配置文件，无需修改代码本身。
-            - 如果路径填写有误，程序会给出友好的报错提示。
+            - **Windows 系统路径示例：**
+              ```json
+              {
+                "anno_dir": "E:\\AIModels\\DeepFashion\\DeepFashion\\Category and Attribute Prediction Benchmark\\Anno_fine",
+                "img_dir": "E:\\AIModels\\DeepFashion\\DeepFashion\\Category and Attribute Prediction Benchmark\\Img\\img_highres"
+              }
+              ```
+            - **Linux 系统路径示例：**
+              ```json
+              {
+                "anno_dir": "/home/username/DeepFashion/Category and Attribute Prediction Benchmark/Anno_fine",
+                "img_dir": "/home/username/DeepFashion/Category and Attribute Prediction Benchmark/Img/img_highres"
+              }
+              ```
+            - **路径注意事项：**
+              - Windows 下路径分隔符使用 `\\` 或 `/`
+              - Linux 下路径分隔符使用 `/`
+              - 建议使用绝对路径，避免相对路径可能带来的问题
+              - 路径中如果包含中文，请确保系统和 Python 环境的编码设置正确
+            - 代码会自动识别当前系统类型并正确处理路径格式
+            - 如果路径配置有误，程序会给出清晰的错误提示，包括当前系统类型信息
+
+        *   **系统兼容性说明：**
+            - 本项目已针对 Windows 和 Linux 系统做了完整的兼容性适配
+            - **Windows 环境注意事项：**
+              - 建议使用 Windows 10 或更高版本
+              - 如果使用 GPU，请确保安装了最新的 NVIDIA 驱动
+              - 建议使用 PowerShell 或 CMD 运行，避免使用 WSL
+            - **Linux 环境注意事项：**
+              - 支持主流 Linux 发行版（Ubuntu、CentOS 等）
+              - 如果使用 GPU，需要正确安装 CUDA 和 NVIDIA 驱动
+              - 确保当前用户对数据目录有读写权限
+            - **通用注意事项：**
+              - Python 版本建议 3.8 或更高
+              - GPU 监控功能需要安装 `nvidia-ml-py` 包
+              - 如遇路径相关错误，请检查 `config.json` 中的路径配置
     *   *提醒: `data/` 目录及其内容默认不会被提交到 Git 仓库 (已在 `.gitignore` 中配置)。*
 3.  **运行应用:** 
     *   确保你处于激活的虚拟环境中。

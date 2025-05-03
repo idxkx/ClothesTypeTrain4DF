@@ -1,31 +1,48 @@
 # Placeholder for Streamlit UI code 
 
-# 忽略PyTorch和Streamlit之间的特定警告
-import warnings
-warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*Tried to instantiate class \"__path__._path\".*")
-warnings.filterwarnings("ignore", message=".*torch.classes.__path__.*")
-
 import sys
 import os
+
+# 预初始化asyncio事件循环，避免PyTorch与Streamlit的异步冲突
+import asyncio
+import warnings
+
+# 忽略PyTorch相关的特定警告
+warnings.filterwarnings("ignore", message=".*torch.classes.__path__._path.*")
+warnings.filterwarnings("ignore", message=".*Tried to instantiate class '__path__._path'.*")
+
+# 尝试初始化asyncio事件循环
+try:
+    # 尝试获取当前事件循环
+    loop = asyncio.get_event_loop()
+except RuntimeError:
+    # 如果当前线程没有事件循环，创建一个新的
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
 # 添加当前目录到Python模块搜索路径中
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
-# 处理asyncio事件循环
+# 预初始化asyncio事件循环，避免PyTorch与Streamlit的冲突
 import asyncio
-import nest_asyncio
 
-# 应用nest_asyncio以允许嵌套事件循环
-nest_asyncio.apply()
-
-# 确保存在事件循环
+# --- 事件循环处理 ---
 try:
+    # 先应用nest_asyncio以允许嵌套事件循环
+    nest_asyncio.apply()
+    # 尝试获取当前事件循环
     loop = asyncio.get_event_loop()
 except RuntimeError:
+    # 如果当前线程没有事件循环，创建一个新的
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+
+# 忽略PyTorch与Streamlit之间的特定警告
+import warnings
+warnings.filterwarnings("ignore", message="torch.classes.__path__._path")
+
 import streamlit as st
 import torch
 import time
@@ -33,6 +50,7 @@ import pandas as pd
 import math
 import traceback
 import json
+import nest_asyncio
 import platform
 import subprocess
 import uuid
@@ -44,7 +62,7 @@ from components.config_panel import create_config_panel
 from components.training_panel import start_training_process, update_training_ui
 from components.history_viewer import display_history, render_action_buttons
 from components.gpu_monitor import update_gpu_info, initialize_gpu
-from components.metadata_manager import display_metadata_viewer, display_metadata_creator, create_metadata_form
+from components.metadata_manager import display_metadata_viewer, display_metadata_creator
 from components.report_generator import batch_generate_metadata
 from utils.state_manager import initialize_session_state
 from utils.file_utils import safe_path, load_results, save_results
@@ -76,10 +94,10 @@ except ImportError as e:
 
 def main():
     """主应用入口函数"""
-# --- 页面配置 ---
+    # --- 页面配置 ---
     st.set_page_config(page_title="喵搭服装识别训练场", layout="wide")
     st.title("👕喵搭👗服装识别模型训练场")
-st.markdown("--- ")
+    st.markdown("--- ")
     
     # --- 初始化会话状态 ---
     initialize_session_state()
@@ -90,23 +108,23 @@ st.markdown("--- ")
     
     # --- 创建主界面 ---
     col_main_1, col_main_2 = st.columns([2, 1])  # 状态/图表区 vs 日志区
-
-with col_main_1:
-    st.subheader("📊 训练状态与指标")
+    
+    with col_main_1:
+        st.subheader("📊 训练状态与指标")
         status_placeholder = st.empty()
         overall_progress_bar = st.progress(0.0)
         epoch_info_placeholder = st.empty()
-    time_info_placeholder = st.empty()
-    diagnostic_report_placeholder = st.empty()
-    functional_test_placeholder = st.empty()
-    loss_chart_placeholder = st.empty()
-    acc_chart_placeholder = st.empty()
-
-with col_main_2:
-    st.subheader("📜 训练日志")
-    log_placeholder = st.empty() 
-    log_placeholder.code("", language='log')
-
+        time_info_placeholder = st.empty()
+        diagnostic_report_placeholder = st.empty()
+        functional_test_placeholder = st.empty()
+        loss_chart_placeholder = st.empty()
+        acc_chart_placeholder = st.empty()
+    
+    with col_main_2:
+        st.subheader("📜 训练日志")
+        log_placeholder = st.empty()
+        log_placeholder.code("", language='log')
+    
     # --- 创建GPU监控区域 ---
     st.sidebar.markdown("--- ")
     st.sidebar.subheader("📈 GPU 监控")
@@ -178,12 +196,12 @@ with col_main_2:
         st.session_state.show_failed = st.checkbox(
             "显示失败的训练",
             value=True,
-            key="main_show_failed_checkbox",
+            key="show_failed_checkbox",
             help="勾选显示训练失败的记录"
         )
     
     # 显示历史记录
-                display_history()
+    display_history()
     
     # --- 元数据查看区域 ---
     with st.expander("🔍 查看模型元数据", expanded=False):
@@ -195,3 +213,4 @@ with col_main_2:
 
 if __name__ == "__main__":
     main()
+
