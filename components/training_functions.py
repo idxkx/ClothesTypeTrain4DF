@@ -460,8 +460,36 @@ def _finalize_training(training_success, history_df, best_val_loss, model_save_d
             "convergence_status": "未知"
         }
     
-    # 执行功能测试
-    if training_success and current_run_result.get("best_model_path") and os.path.exists(current_run_result["best_model_path"]):
+    # 确保训练状态为成功，无论功能测试是否通过
+    if training_success:
+        current_run_result["status"] = "已完成"
+        append_log("训练成功完成！")
+    else:
+        current_run_result["status"] = "失败"
+        append_log("训练过程中出现错误。")
+    
+    # 执行功能测试，但不影响训练成功状态
+    test_success = False
+    if current_run_result.get("best_model_path") and os.path.exists(current_run_result["best_model_path"]):
+        # 先确认元数据文件是否存在
+        model_name = training_params['model_name']
+        metadata_file = os.path.join(model_save_dir, f"{model_name}_metadata.json")
+        
+        if not os.path.exists(metadata_file):
+            ui_components['functional_test'].error(f"元数据文件不存在: {metadata_file}")
+            append_log(f"元数据文件不存在: {metadata_file}，功能测试将失败")
+            ui_components['functional_test'].warning("请手动创建元数据文件后再进行功能测试，或使用fix_metadata.py工具")
+            
+            # 设置功能测试结果为失败，并提供详细原因
+            current_run_result["functional_test_result"] = "失败"
+            current_run_result["functional_test_error"] = {
+                "error_type": "missing_metadata",
+                "message": f"元数据文件不存在: {metadata_file}",
+                "solution": "请手动创建元数据文件或使用fix_metadata.py工具"
+            }
+            return
+        
+        # 执行功能测试
         from components.report_generator import run_functional_test
         model_config = {
             'num_categories': 50,  # 假设类别数为50
@@ -493,18 +521,15 @@ def _finalize_training(training_success, history_df, best_val_loss, model_save_d
         # 添加错误详情到训练结果
         if not test_success:
             current_run_result["functional_test_error"] = error_details
-    elif not training_success:
-        ui_components['functional_test'].warning("训练未成功完成，跳过功能测试。")
-        append_log("训练未成功完成，跳过功能测试。")
-        current_run_result["functional_test_result"] = "跳过 (训练失败)"
-    elif not current_run_result.get("best_model_path"):
-        ui_components['functional_test'].warning("未找到有效的最佳模型路径，跳过功能测试。")
-        append_log("未找到有效的最佳模型路径，跳过功能测试。")
-        current_run_result["functional_test_result"] = "跳过 (无模型路径)"
-    elif not os.path.exists(current_run_result["best_model_path"]):
-        ui_components['functional_test'].warning("模型文件不存在，跳过功能测试。")
-        append_log(f"模型文件不存在: {current_run_result['best_model_path']}，跳过功能测试。")
-        current_run_result["functional_test_result"] = "跳过 (模型文件不存在)"
+    else:
+        if not current_run_result.get("best_model_path"):
+            ui_components['functional_test'].warning("未找到有效的最佳模型路径，跳过功能测试。")
+            append_log("未找到有效的最佳模型路径，跳过功能测试。")
+            current_run_result["functional_test_result"] = "跳过 (无模型路径)"
+        elif not os.path.exists(current_run_result["best_model_path"]):
+            ui_components['functional_test'].warning("模型文件不存在，跳过功能测试。")
+            append_log(f"模型文件不存在: {current_run_result['best_model_path']}，跳过功能测试。")
+            current_run_result["functional_test_result"] = "跳过 (模型文件不存在)"
     
     # 保存当前运行结果
     all_results = load_results(results_file)

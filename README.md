@@ -190,6 +190,37 @@ ClothesTypeDemo/
     *   (可选) 可视化模型关注区域 (例如使用热力图)。
 *   **参数调整:** (可选) 允许调整部分推理参数 (如置信度阈值)。
 
+## 常见问题及解决方案
+
+### 功能测试失败问题
+
+如果在使用模型或查看模型效果时遇到"功能测试失败"的错误，这可能是因为模型缺少必要的元数据文件。解决方法如下：
+
+1. **使用独立脚本生成元数据（推荐）**
+   项目根目录下提供了一个独立的脚本`fix_metadata.py`，它不依赖于Streamlit，可以直接运行：
+   ```bash
+   python3 fix_metadata.py
+   ```
+   这个脚本会自动查找所有缺少元数据的模型，并生成相应的元数据文件。
+
+2. **批量生成元数据文件（原始方法）**
+   或者运行以下命令为所有模型生成元数据（需要安装streamlit）：
+   ```bash
+   python3 -c "exec(open(\"components/report_generator.py\").read()); from utils.file_utils import load_results; batch_generate_metadata()"
+   ```
+
+3. **使用UI界面解决**
+   或者在Streamlit网页界面中：
+   - 进入"模型管理"页面
+   - 点击"批量生成缺失的元数据"按钮
+
+完成后，模型的功能测试应该可以正常通过。
+
+#### 错误类型说明
+- `unknown_error`: 遇到"stat: path should be string, bytes, os.PathLike or integer, not NoneType"错误通常表示找不到模型元数据文件。请使用上述方法生成元数据。
+
+### 其他常见问题
+
 ---
 
 **注意:** 本 README 会随着项目进展持续更新。 

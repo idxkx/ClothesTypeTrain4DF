@@ -924,5 +924,1068 @@
             "message": "stat: path should be string, bytes, os.PathLike or integer, not NoneType",
             "solution": "请根据错误详情采取对应解决方案，必要时可尝试重新训练模型。"
         }
+    },
+    {
+        "start_time": 1746257114.4872918,
+        "start_time_str": "2025-05-03 15:25:14",
+        "model_name": "MD_RESNET18_1_128_50E04_0503_1525",
+        "strategy": "快速体验 (Fast Trial)",
+        "parameters": {
+            "model_name": "MD_RESNET18_1_128_50E04_0503_1525",
+            "backbone": "resnet18",
+            "pretrained": true,
+            "epochs": 1,
+            "batch_size": 128,
+            "learning_rate": 0.0005,
+            "attribute_loss_weight": 1.0,
+            "anno_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Anno_fine",
+            "img_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Img/img_highres",
+            "num_workers": 4
+        },
+        "backbone": "resnet18",
+        "anno_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Anno_fine",
+        "img_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Img/img_highres",
+        "status": "已完成",
+        "total_epochs": 1,
+        "completed_epochs": 1,
+        "best_val_loss": 2.0543613052368164,
+        "best_epoch": 1,
+        "best_model_path": "./models/MD_RESNET18_1_128_50E04_0503_1525/best_model_MD_RESNET18_1_128_50E04_0503_1525_epoch1.pth",
+        "diagnostic_summary": "### 🩺 训练诊断报告\n- **训练轮数:** 1 / 1\n- **最佳验证损失:** 2.0544 (出现在 Epoch 1)\n- **最终验证损失:** 2.0544\n- **最终验证准确率:** 50.95%\n- **收敛性:** ⚠️ 训练轮数较少，难以判断收敛趋势。\n- **过拟合风险:** 高 \n  - **损失差异:** 0.62 | **准确率差异:** 11.9%\n  - **原因:** 损失差异(0.62)大于0.5，准确率差异(11.9%)大于8%\n  - _建议: 增强正则化(增加dropout或权重衰减)、增加数据增强或缩小模型规模_",
+        "functional_test_result": "失败",
+        "end_time": 1746257190.6725278,
+        "end_time_str": "2025-05-03 15:26:30",
+        "duration": 76.18523597717285,
+        "duration_str": "0:01:16",
+        "training_history": [
+            {
+                "epoch": 1,
+                "Train Loss": 2.678107953480312,
+                "Validation Loss": 2.0543613052368164,
+                "Train Accuracy (%)": 39.02142857142857,
+                "Validation Accuracy (%)": 50.95
+            }
+        ],
+        "gpu_metrics_history": [
+            {
+                "step": 0,
+                "GPU Utilization (%)": 0,
+                "Memory Utilization (%)": 4.294903110242632
+            },
+            {
+                "step": 1,
+                "GPU Utilization (%)": 2,
+                "Memory Utilization (%)": 6.140337485751506
+            },
+            {
+                "step": 2,
+                "GPU Utilization (%)": 15,
+                "Memory Utilization (%)": 24.370267464582316
+            }
+        ],
+        "log_messages": [
+            "[15:25:14] 使用的训练参数: {'epochs': 1, 'batch_size': 128, 'learning_rate': 0.0005, 'device': 'cuda:0', 'model_save_path': './models/MD_RESNET18_1_128_50E04_0503_1525', 'attribute_loss_weight': 1.0, 'num_workers': 4}",
+            "[15:25:14] 使用的骨干网络: resnet18",
+            "[15:25:14] Anno Dir Path: /home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Anno_fine",
+            "[15:25:14] Image Dir Path: /home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Img/img_highres",
+            "[15:25:14] 已定义图像转换流程 (Resize, ToTensor, Normalize)",
+            "[15:25:14] 初始化训练数据集...",
+            "[15:25:14] 训练集加载成功，样本数: 14000",
+            "[15:25:14] 初始化验证数据集...",
+            "[15:25:14] 验证集加载成功，样本数: 2000",
+            "[15:25:14] 初始化模型 (Backbone: resnet18)...",
+            "[15:25:15] 模型初始化成功。将模型移动到设备: cuda:0",
+            "[15:25:15] 初始化 Trainer...",
+            "[15:25:15] Trainer 初始化成功.",
+            "[15:25:15] \n==================== 开始训练 ====================",
+            "[15:25:15] \n--- 开始训练 Epoch 1/1 ---",
+            "[15:26:20] --- Epoch 1 训练完成 (Avg Loss: 2.6781, Cat Acc: 39.02%) ---",
+            "[15:26:30] --- 验证完成 (Avg Loss: 2.0544, Cat Acc: 50.95%) ---",
+            "[15:26:30] 清理完成，共删除 0 个旧模型文件",
+            "[15:26:30] ** 新的最佳模型已保存到: ./models/MD_RESNET18_1_128_50E04_0503_1525/best_model_MD_RESNET18_1_128_50E04_0503_1525_epoch1.pth (Val Loss: 2.0544) **",
+            "[15:26:30] 训练成功完成！",
+            "[15:26:30] 总训练时间: 76.19 秒",
+            "[15:26:30] 最佳验证损失: 2.0544",
+            "[15:26:30] \n--- 诊断报告已生成 ---",
+            "[15:26:31] 功能测试失败: Traceback (most recent call last):\n  File \"/home/litata/xuke/ClothesTypeTrain4DF/components/report_generator.py\", line 339, in run_functional_test\n    if os.path.exists(metadata_file):\n  File \"/home/litata/apps/miniconda3/envs/miaoda_clothes/lib/python3.10/genericpath.py\", line 19, in exists\n    os.stat(path)\nTypeError: stat: path should be string, bytes, os.PathLike or integer, not NoneType\n",
+            "[15:26:31] \n--- 功能模拟测试 --- \n功能测试失败: unknown_error"
+        ],
+        "evaluation": {
+            "overfitting_risk": "高",
+            "loss_diff": 0.6237466482434955,
+            "accuracy_diff": 11.92857142857143,
+            "convergence_status": "轮数不足",
+            "best_epoch": 1,
+            "best_val_loss": 2.0543613052368164,
+            "final_val_loss": 2.0543613052368164,
+            "final_val_accuracy": 50.95
+        },
+        "functional_test_error": {
+            "missing_metadata": true,
+            "error_type": "unknown_error",
+            "message": "stat: path should be string, bytes, os.PathLike or integer, not NoneType",
+            "solution": "请根据错误详情采取对应解决方案，必要时可尝试重新训练模型。"
+        }
+    },
+    {
+        "start_time": 1746257437.4287107,
+        "start_time_str": "2025-05-03 15:30:37",
+        "model_name": "MD_EFFICIENTNET_B3_15_64_10E04_0503_1529",
+        "strategy": "均衡推荐 (Balanced)",
+        "parameters": {
+            "model_name": "MD_EFFICIENTNET_B3_15_64_10E04_0503_1529",
+            "backbone": "efficientnet_b3",
+            "pretrained": true,
+            "epochs": 15,
+            "batch_size": 64,
+            "learning_rate": 0.0001,
+            "attribute_loss_weight": 1.0,
+            "anno_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Anno_fine",
+            "img_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Img/img_highres",
+            "num_workers": 4
+        },
+        "backbone": "efficientnet_b3",
+        "anno_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Anno_fine",
+        "img_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Img/img_highres",
+        "status": "已完成",
+        "total_epochs": 15,
+        "completed_epochs": 15,
+        "best_val_loss": 1.5322604207992554,
+        "best_epoch": 2,
+        "best_model_path": "./models/MD_EFFICIENTNET_B3_15_64_10E04_0503_1529/best_model_MD_EFFICIENTNET_B3_15_64_10E04_0503_1529_epoch2.pth",
+        "diagnostic_summary": "### 🩺 训练诊断报告\n- **训练轮数:** 15 / 15\n- **最佳验证损失:** 1.5323 (出现在 Epoch 2)\n- **最终验证损失:** 2.3134\n- **最终验证准确率:** 61.60%\n- **收敛性:** ❌ 验证损失在最后5轮未能持续下降，可能已收敛或遇到瓶颈。\n- **过拟合风险:** 高 \n  - **损失差异:** 2.19 | **准确率差异:** 38.0%\n  - **原因:** 损失差异(2.19)大于0.5，准确率差异(38.0%)大于15%\n  - _建议: 增强正则化(增加dropout或权重衰减)、增加数据增强或缩小模型规模_",
+        "functional_test_result": "失败",
+        "end_time": 1746258560.9573965,
+        "end_time_str": "2025-05-03 15:49:20",
+        "duration": 1123.5286858081818,
+        "duration_str": "0:18:43",
+        "training_history": [
+            {
+                "epoch": 1,
+                "Train Loss": 2.503198447091239,
+                "Validation Loss": 1.7350111083984374,
+                "Train Accuracy (%)": 45.371428571428574,
+                "Validation Accuracy (%)": 58.9
+            },
+            {
+                "epoch": 2,
+                "Train Loss": 1.473447460447039,
+                "Validation Loss": 1.5322604207992554,
+                "Train Accuracy (%)": 65.71428571428571,
+                "Validation Accuracy (%)": 62.85
+            },
+            {
+                "epoch": 3,
+                "Train Loss": 1.0361584694726127,
+                "Validation Loss": 1.563599624633789,
+                "Train Accuracy (%)": 76.70714285714286,
+                "Validation Accuracy (%)": 62.7
+            },
+            {
+                "epoch": 4,
+                "Train Loss": 0.6926859071595328,
+                "Validation Loss": 1.6646707077026368,
+                "Train Accuracy (%)": 86.32857142857142,
+                "Validation Accuracy (%)": 62.95
+            },
+            {
+                "epoch": 5,
+                "Train Loss": 0.459740928377424,
+                "Validation Loss": 1.7942264308929443,
+                "Train Accuracy (%)": 93.54285714285714,
+                "Validation Accuracy (%)": 62.5
+            },
+            {
+                "epoch": 6,
+                "Train Loss": 0.33775068174089706,
+                "Validation Loss": 1.898630470275879,
+                "Train Accuracy (%)": 97.0,
+                "Validation Accuracy (%)": 62.45
+            },
+            {
+                "epoch": 7,
+                "Train Loss": 0.27375825577122825,
+                "Validation Loss": 1.9493552074432372,
+                "Train Accuracy (%)": 98.41428571428571,
+                "Validation Accuracy (%)": 62.25
+            },
+            {
+                "epoch": 8,
+                "Train Loss": 0.2338547203540802,
+                "Validation Loss": 2.0160618209838868,
+                "Train Accuracy (%)": 99.12142857142857,
+                "Validation Accuracy (%)": 62.15
+            },
+            {
+                "epoch": 9,
+                "Train Loss": 0.20916084001745497,
+                "Validation Loss": 2.058154514312744,
+                "Train Accuracy (%)": 99.32142857142857,
+                "Validation Accuracy (%)": 62.5
+            },
+            {
+                "epoch": 10,
+                "Train Loss": 0.192237954889025,
+                "Validation Loss": 2.1213033084869384,
+                "Train Accuracy (%)": 99.38571428571429,
+                "Validation Accuracy (%)": 62.1
+            },
+            {
+                "epoch": 11,
+                "Train Loss": 0.17642131621497018,
+                "Validation Loss": 2.1345047092437746,
+                "Train Accuracy (%)": 99.52857142857142,
+                "Validation Accuracy (%)": 62.5
+            },
+            {
+                "epoch": 12,
+                "Train Loss": 0.1664204295022147,
+                "Validation Loss": 2.190904161453247,
+                "Train Accuracy (%)": 99.55714285714286,
+                "Validation Accuracy (%)": 62.9
+            },
+            {
+                "epoch": 13,
+                "Train Loss": 0.15196778852599008,
+                "Validation Loss": 2.221380355834961,
+                "Train Accuracy (%)": 99.55,
+                "Validation Accuracy (%)": 61.95
+            },
+            {
+                "epoch": 14,
+                "Train Loss": 0.14070610994952065,
+                "Validation Loss": 2.2336770401000976,
+                "Train Accuracy (%)": 99.6,
+                "Validation Accuracy (%)": 61.7
+            },
+            {
+                "epoch": 15,
+                "Train Loss": 0.1271667822429112,
+                "Validation Loss": 2.313383247375488,
+                "Train Accuracy (%)": 99.6,
+                "Validation Accuracy (%)": 61.6
+            }
+        ],
+        "gpu_metrics_history": [
+            {
+                "step": 0,
+                "GPU Utilization (%)": 0,
+                "Memory Utilization (%)": 24.39469345383488
+            },
+            {
+                "step": 1,
+                "GPU Utilization (%)": 1,
+                "Memory Utilization (%)": 24.39469345383488
+            },
+            {
+                "step": 2,
+                "GPU Utilization (%)": 17,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 3,
+                "GPU Utilization (%)": 1,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 4,
+                "GPU Utilization (%)": 28,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 5,
+                "GPU Utilization (%)": 0,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 6,
+                "GPU Utilization (%)": 29,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 7,
+                "GPU Utilization (%)": 0,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 8,
+                "GPU Utilization (%)": 42,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 9,
+                "GPU Utilization (%)": 42,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 10,
+                "GPU Utilization (%)": 4,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 11,
+                "GPU Utilization (%)": 23,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 12,
+                "GPU Utilization (%)": 40,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 13,
+                "GPU Utilization (%)": 0,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 14,
+                "GPU Utilization (%)": 21,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 15,
+                "GPU Utilization (%)": 19,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 16,
+                "GPU Utilization (%)": 26,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 17,
+                "GPU Utilization (%)": 26,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 18,
+                "GPU Utilization (%)": 42,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 19,
+                "GPU Utilization (%)": 42,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 20,
+                "GPU Utilization (%)": 42,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 21,
+                "GPU Utilization (%)": 42,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 22,
+                "GPU Utilization (%)": 40,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 23,
+                "GPU Utilization (%)": 40,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 24,
+                "GPU Utilization (%)": 29,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 25,
+                "GPU Utilization (%)": 29,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 26,
+                "GPU Utilization (%)": 20,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 27,
+                "GPU Utilization (%)": 8,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 28,
+                "GPU Utilization (%)": 26,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 29,
+                "GPU Utilization (%)": 3,
+                "Memory Utilization (%)": 53.40462668946426
+            },
+            {
+                "step": 30,
+                "GPU Utilization (%)": 34,
+                "Memory Utilization (%)": 53.40462668946426
+            }
+        ],
+        "log_messages": [
+            "[15:30:37] 使用的训练参数: {'epochs': 15, 'batch_size': 64, 'learning_rate': 0.0001, 'device': 'cuda:0', 'model_save_path': './models/MD_EFFICIENTNET_B3_15_64_10E04_0503_1529', 'attribute_loss_weight': 1.0, 'num_workers': 4}",
+            "[15:30:37] 使用的骨干网络: efficientnet_b3",
+            "[15:30:37] Anno Dir Path: /home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Anno_fine",
+            "[15:30:37] Image Dir Path: /home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Img/img_highres",
+            "[15:30:37] 已定义图像转换流程 (Resize, ToTensor, Normalize)",
+            "[15:30:37] 初始化训练数据集...",
+            "[15:30:37] 训练集加载成功，样本数: 14000",
+            "[15:30:37] 初始化验证数据集...",
+            "[15:30:37] 验证集加载成功，样本数: 2000",
+            "[15:30:37] 初始化模型 (Backbone: efficientnet_b3)...",
+            "[15:30:48] 模型初始化成功。将模型移动到设备: cuda:0",
+            "[15:30:48] 初始化 Trainer...",
+            "[15:30:48] Trainer 初始化成功.",
+            "[15:30:48] \n==================== 开始训练 ====================",
+            "[15:30:48] \n--- 开始训练 Epoch 1/15 ---",
+            "[15:31:54] --- Epoch 1 训练完成 (Avg Loss: 2.5032, Cat Acc: 45.37%) ---",
+            "[15:32:04] --- 验证完成 (Avg Loss: 1.7350, Cat Acc: 58.90%) ---",
+            "[15:32:04] 清理完成，共删除 0 个旧模型文件",
+            "[15:32:04] ** 新的最佳模型已保存到: ./models/MD_EFFICIENTNET_B3_15_64_10E04_0503_1529/best_model_MD_EFFICIENTNET_B3_15_64_10E04_0503_1529_epoch1.pth (Val Loss: 1.7350) **",
+            "[15:32:04] \n--- 开始训练 Epoch 2/15 ---",
+            "[15:33:08] --- Epoch 2 训练完成 (Avg Loss: 1.4734, Cat Acc: 65.71%) ---",
+            "[15:33:18] --- 验证完成 (Avg Loss: 1.5323, Cat Acc: 62.85%) ---",
+            "[15:33:18] 已删除旧的最佳模型: best_model_MD_EFFICIENTNET_B3_15_64_10E04_0503_1529_epoch1.pth",
+            "[15:33:18] 清理完成，共删除 1 个旧模型文件",
+            "[15:33:18] ** 新的最佳模型已保存到: ./models/MD_EFFICIENTNET_B3_15_64_10E04_0503_1529/best_model_MD_EFFICIENTNET_B3_15_64_10E04_0503_1529_epoch2.pth (Val Loss: 1.5323) **",
+            "[15:33:18] \n--- 开始训练 Epoch 3/15 ---",
+            "[15:34:21] --- Epoch 3 训练完成 (Avg Loss: 1.0362, Cat Acc: 76.71%) ---",
+            "[15:34:31] --- 验证完成 (Avg Loss: 1.5636, Cat Acc: 62.70%) ---",
+            "[15:34:31] \n--- 开始训练 Epoch 4/15 ---",
+            "[15:35:36] --- Epoch 4 训练完成 (Avg Loss: 0.6927, Cat Acc: 86.33%) ---",
+            "[15:35:46] --- 验证完成 (Avg Loss: 1.6647, Cat Acc: 62.95%) ---",
+            "[15:35:46] \n--- 开始训练 Epoch 5/15 ---",
+            "[15:36:50] --- Epoch 5 训练完成 (Avg Loss: 0.4597, Cat Acc: 93.54%) ---",
+            "[15:37:00] --- 验证完成 (Avg Loss: 1.7942, Cat Acc: 62.50%) ---",
+            "[15:37:00] \n--- 开始训练 Epoch 6/15 ---",
+            "[15:38:05] --- Epoch 6 训练完成 (Avg Loss: 0.3378, Cat Acc: 97.00%) ---",
+            "[15:38:16] --- 验证完成 (Avg Loss: 1.8986, Cat Acc: 62.45%) ---",
+            "[15:38:16] \n--- 开始训练 Epoch 7/15 ---",
+            "[15:39:19] --- Epoch 7 训练完成 (Avg Loss: 0.2738, Cat Acc: 98.41%) ---",
+            "[15:39:29] --- 验证完成 (Avg Loss: 1.9494, Cat Acc: 62.25%) ---",
+            "[15:39:29] \n--- 开始训练 Epoch 8/15 ---",
+            "[15:40:35] --- Epoch 8 训练完成 (Avg Loss: 0.2339, Cat Acc: 99.12%) ---",
+            "[15:40:44] --- 验证完成 (Avg Loss: 2.0161, Cat Acc: 62.15%) ---",
+            "[15:40:44] \n--- 开始训练 Epoch 9/15 ---",
+            "[15:41:46] --- Epoch 9 训练完成 (Avg Loss: 0.2092, Cat Acc: 99.32%) ---",
+            "[15:41:56] --- 验证完成 (Avg Loss: 2.0582, Cat Acc: 62.50%) ---",
+            "[15:41:56] \n--- 开始训练 Epoch 10/15 ---",
+            "[15:43:00] --- Epoch 10 训练完成 (Avg Loss: 0.1922, Cat Acc: 99.39%) ---",
+            "[15:43:10] --- 验证完成 (Avg Loss: 2.1213, Cat Acc: 62.10%) ---",
+            "[15:43:10] \n--- 开始训练 Epoch 11/15 ---",
+            "[15:44:12] --- Epoch 11 训练完成 (Avg Loss: 0.1764, Cat Acc: 99.53%) ---",
+            "[15:44:23] --- 验证完成 (Avg Loss: 2.1345, Cat Acc: 62.50%) ---",
+            "[15:44:23] \n--- 开始训练 Epoch 12/15 ---",
+            "[15:45:26] --- Epoch 12 训练完成 (Avg Loss: 0.1664, Cat Acc: 99.56%) ---",
+            "[15:45:36] --- 验证完成 (Avg Loss: 2.1909, Cat Acc: 62.90%) ---",
+            "[15:45:36] \n--- 开始训练 Epoch 13/15 ---",
+            "[15:46:41] --- Epoch 13 训练完成 (Avg Loss: 0.1520, Cat Acc: 99.55%) ---",
+            "[15:46:51] --- 验证完成 (Avg Loss: 2.2214, Cat Acc: 61.95%) ---",
+            "[15:46:51] \n--- 开始训练 Epoch 14/15 ---",
+            "[15:47:56] --- Epoch 14 训练完成 (Avg Loss: 0.1407, Cat Acc: 99.60%) ---",
+            "[15:48:06] --- 验证完成 (Avg Loss: 2.2337, Cat Acc: 61.70%) ---",
+            "[15:48:07] \n--- 开始训练 Epoch 15/15 ---",
+            "[15:49:10] --- Epoch 15 训练完成 (Avg Loss: 0.1272, Cat Acc: 99.60%) ---",
+            "[15:49:20] --- 验证完成 (Avg Loss: 2.3134, Cat Acc: 61.60%) ---",
+            "[15:49:20] 训练成功完成！",
+            "[15:49:20] 总训练时间: 1123.53 秒",
+            "[15:49:20] 最佳验证损失: 1.5323",
+            "[15:49:20] \n--- 诊断报告已生成 ---",
+            "[15:49:21] 功能测试失败: Traceback (most recent call last):\n  File \"/home/litata/xuke/ClothesTypeTrain4DF/components/report_generator.py\", line 339, in run_functional_test\n    if os.path.exists(metadata_file):\n  File \"/home/litata/apps/miniconda3/envs/miaoda_clothes/lib/python3.10/genericpath.py\", line 19, in exists\n    os.stat(path)\nTypeError: stat: path should be string, bytes, os.PathLike or integer, not NoneType\n",
+            "[15:49:21] \n--- 功能模拟测试 --- \n功能测试失败: unknown_error"
+        ],
+        "evaluation": {
+            "overfitting_risk": "高",
+            "loss_diff": 2.186216465132577,
+            "accuracy_diff": 37.99999999999999,
+            "convergence_status": "已收敛或停滞",
+            "best_epoch": 2,
+            "best_val_loss": 1.5322604207992554,
+            "final_val_loss": 2.313383247375488,
+            "final_val_accuracy": 61.6
+        },
+        "functional_test_error": {
+            "missing_metadata": true,
+            "error_type": "unknown_error",
+            "message": "stat: path should be string, bytes, os.PathLike or integer, not NoneType",
+            "solution": "请根据错误详情采取对应解决方案，必要时可尝试重新训练模型。"
+        }
+    },
+    {
+        "start_time": 1746265517.0246408,
+        "start_time_str": "2025-05-03 17:45:17",
+        "model_name": "MD_RESNET18_5_128_50E04_0503_1745",
+        "strategy": "快速体验 (Fast Trial)",
+        "parameters": {
+            "model_name": "MD_RESNET18_5_128_50E04_0503_1745",
+            "backbone": "resnet18",
+            "pretrained": true,
+            "epochs": 5,
+            "batch_size": 128,
+            "learning_rate": 0.0005,
+            "attribute_loss_weight": 1.0,
+            "anno_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Anno_fine",
+            "img_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Img/img_highres",
+            "num_workers": 4
+        },
+        "backbone": "resnet18",
+        "anno_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Anno_fine",
+        "img_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Img/img_highres",
+        "status": "已完成",
+        "total_epochs": 5,
+        "completed_epochs": 5,
+        "best_val_loss": 1.5978248329162599,
+        "best_epoch": 4,
+        "best_model_path": "./models/MD_RESNET18_5_128_50E04_0503_1745/best_model_MD_RESNET18_5_128_50E04_0503_1745_epoch4.pth",
+        "diagnostic_summary": "### 🩺 训练诊断报告\n- **训练轮数:** 5 / 5\n- **最佳验证损失:** 1.5978 (出现在 Epoch 4)\n- **最终验证损失:** 1.6744\n- **最终验证准确率:** 60.70%\n- **收敛性:** ⚠️ 验证损失在最后5轮有所波动，但整体仍在下降。\n- **过拟合风险:** 高 \n  - **损失差异:** 0.80 | **准确率差异:** 20.9%\n  - **原因:** 损失差异(0.80)大于0.5，准确率差异(20.9%)大于15%\n  - _建议: 增强正则化(增加dropout或权重衰减)、增加数据增强或缩小模型规模_",
+        "functional_test_result": "失败",
+        "end_time": 1746265895.6529346,
+        "end_time_str": "2025-05-03 17:51:35",
+        "duration": 378.6282937526703,
+        "duration_str": "0:06:18",
+        "training_history": [
+            {
+                "epoch": 1,
+                "Train Loss": 2.675010399682181,
+                "Validation Loss": 2.0335165481567383,
+                "Train Accuracy (%)": 38.72857142857143,
+                "Validation Accuracy (%)": 51.35
+            },
+            {
+                "epoch": 2,
+                "Train Loss": 1.7849024881635394,
+                "Validation Loss": 1.7344427709579469,
+                "Train Accuracy (%)": 57.05714285714286,
+                "Validation Accuracy (%)": 57.85
+            },
+            {
+                "epoch": 3,
+                "Train Loss": 1.4283465371813093,
+                "Validation Loss": 1.6849311981201172,
+                "Train Accuracy (%)": 65.82857142857142,
+                "Validation Accuracy (%)": 59.2
+            },
+            {
+                "epoch": 4,
+                "Train Loss": 1.1428221223694937,
+                "Validation Loss": 1.5978248329162599,
+                "Train Accuracy (%)": 73.56428571428572,
+                "Validation Accuracy (%)": 61.75
+            },
+            {
+                "epoch": 5,
+                "Train Loss": 0.8737765336036682,
+                "Validation Loss": 1.6743976049423217,
+                "Train Accuracy (%)": 81.6,
+                "Validation Accuracy (%)": 60.7
+            }
+        ],
+        "gpu_metrics_history": [
+            {
+                "step": 0,
+                "GPU Utilization (%)": 0,
+                "Memory Utilization (%)": 4.294903110242632
+            },
+            {
+                "step": 1,
+                "GPU Utilization (%)": 2,
+                "Memory Utilization (%)": 6.140337485751506
+            },
+            {
+                "step": 2,
+                "GPU Utilization (%)": 15,
+                "Memory Utilization (%)": 24.370267464582316
+            },
+            {
+                "step": 3,
+                "GPU Utilization (%)": 0,
+                "Memory Utilization (%)": 24.370267464582316
+            },
+            {
+                "step": 4,
+                "GPU Utilization (%)": 15,
+                "Memory Utilization (%)": 24.370267464582316
+            },
+            {
+                "step": 5,
+                "GPU Utilization (%)": 15,
+                "Memory Utilization (%)": 24.370267464582316
+            },
+            {
+                "step": 6,
+                "GPU Utilization (%)": 15,
+                "Memory Utilization (%)": 24.370267464582316
+            },
+            {
+                "step": 7,
+                "GPU Utilization (%)": 15,
+                "Memory Utilization (%)": 24.370267464582316
+            },
+            {
+                "step": 8,
+                "GPU Utilization (%)": 15,
+                "Memory Utilization (%)": 24.370267464582316
+            },
+            {
+                "step": 9,
+                "GPU Utilization (%)": 1,
+                "Memory Utilization (%)": 24.370267464582316
+            },
+            {
+                "step": 10,
+                "GPU Utilization (%)": 15,
+                "Memory Utilization (%)": 24.370267464582316
+            }
+        ],
+        "log_messages": [
+            "[17:45:17] 使用的训练参数: {'epochs': 5, 'batch_size': 128, 'learning_rate': 0.0005, 'device': 'cuda:0', 'model_save_path': './models/MD_RESNET18_5_128_50E04_0503_1745', 'attribute_loss_weight': 1.0, 'num_workers': 4}",
+            "[17:45:17] 使用的骨干网络: resnet18",
+            "[17:45:17] Anno Dir Path: /home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Anno_fine",
+            "[17:45:17] Image Dir Path: /home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Img/img_highres",
+            "[17:45:17] 已定义图像转换流程 (Resize, ToTensor, Normalize)",
+            "[17:45:17] 初始化训练数据集...",
+            "[17:45:17] 训练集加载成功，样本数: 14000",
+            "[17:45:17] 初始化验证数据集...",
+            "[17:45:17] 验证集加载成功，样本数: 2000",
+            "[17:45:17] 初始化模型 (Backbone: resnet18)...",
+            "[17:45:17] 模型初始化成功。将模型移动到设备: cuda:0",
+            "[17:45:18] 初始化 Trainer...",
+            "[17:45:18] Trainer 初始化成功.",
+            "[17:45:18] \n==================== 开始训练 ====================",
+            "[17:45:18] \n--- 开始训练 Epoch 1/5 ---",
+            "[17:46:23] --- Epoch 1 训练完成 (Avg Loss: 2.6750, Cat Acc: 38.73%) ---",
+            "[17:46:34] --- 验证完成 (Avg Loss: 2.0335, Cat Acc: 51.35%) ---",
+            "[17:46:34] 清理完成，共删除 0 个旧模型文件",
+            "[17:46:34] ** 新的最佳模型已保存到: ./models/MD_RESNET18_5_128_50E04_0503_1745/best_model_MD_RESNET18_5_128_50E04_0503_1745_epoch1.pth (Val Loss: 2.0335) **",
+            "[17:46:34] \n--- 开始训练 Epoch 2/5 ---",
+            "[17:47:40] --- Epoch 2 训练完成 (Avg Loss: 1.7849, Cat Acc: 57.06%) ---",
+            "[17:47:50] --- 验证完成 (Avg Loss: 1.7344, Cat Acc: 57.85%) ---",
+            "[17:47:51] 已删除旧的最佳模型: best_model_MD_RESNET18_5_128_50E04_0503_1745_epoch1.pth",
+            "[17:47:51] 清理完成，共删除 1 个旧模型文件",
+            "[17:47:51] ** 新的最佳模型已保存到: ./models/MD_RESNET18_5_128_50E04_0503_1745/best_model_MD_RESNET18_5_128_50E04_0503_1745_epoch2.pth (Val Loss: 1.7344) **",
+            "[17:47:51] \n--- 开始训练 Epoch 3/5 ---",
+            "[17:48:54] --- Epoch 3 训练完成 (Avg Loss: 1.4283, Cat Acc: 65.83%) ---",
+            "[17:49:05] --- 验证完成 (Avg Loss: 1.6849, Cat Acc: 59.20%) ---",
+            "[17:49:05] 已删除旧的最佳模型: best_model_MD_RESNET18_5_128_50E04_0503_1745_epoch2.pth",
+            "[17:49:05] 清理完成，共删除 1 个旧模型文件",
+            "[17:49:05] ** 新的最佳模型已保存到: ./models/MD_RESNET18_5_128_50E04_0503_1745/best_model_MD_RESNET18_5_128_50E04_0503_1745_epoch3.pth (Val Loss: 1.6849) **",
+            "[17:49:05] \n--- 开始训练 Epoch 4/5 ---",
+            "[17:50:09] --- Epoch 4 训练完成 (Avg Loss: 1.1428, Cat Acc: 73.56%) ---",
+            "[17:50:20] --- 验证完成 (Avg Loss: 1.5978, Cat Acc: 61.75%) ---",
+            "[17:50:20] 已删除旧的最佳模型: best_model_MD_RESNET18_5_128_50E04_0503_1745_epoch3.pth",
+            "[17:50:20] 清理完成，共删除 1 个旧模型文件",
+            "[17:50:20] ** 新的最佳模型已保存到: ./models/MD_RESNET18_5_128_50E04_0503_1745/best_model_MD_RESNET18_5_128_50E04_0503_1745_epoch4.pth (Val Loss: 1.5978) **",
+            "[17:50:20] \n--- 开始训练 Epoch 5/5 ---",
+            "[17:51:25] --- Epoch 5 训练完成 (Avg Loss: 0.8738, Cat Acc: 81.60%) ---",
+            "[17:51:35] --- 验证完成 (Avg Loss: 1.6744, Cat Acc: 60.70%) ---",
+            "[17:51:35] 训练成功完成！",
+            "[17:51:35] 总训练时间: 378.63 秒",
+            "[17:51:35] 最佳验证损失: 1.5978",
+            "[17:51:35] \n--- 诊断报告已生成 ---",
+            "[17:51:36] 功能测试失败: Traceback (most recent call last):\n  File \"/home/litata/xuke/ClothesTypeTrain4DF/components/report_generator.py\", line 339, in run_functional_test\n    if os.path.exists(metadata_file):\n  File \"/home/litata/apps/miniconda3/envs/miaoda_clothes/lib/python3.10/genericpath.py\", line 19, in exists\n    os.stat(path)\nTypeError: stat: path should be string, bytes, os.PathLike or integer, not NoneType\n",
+            "[17:51:36] \n--- 功能模拟测试 --- \n功能测试失败: unknown_error"
+        ],
+        "evaluation": {
+            "overfitting_risk": "高",
+            "loss_diff": 0.8006210713386535,
+            "accuracy_diff": 20.89999999999999,
+            "convergence_status": "波动下降",
+            "best_epoch": 4,
+            "best_val_loss": 1.5978248329162599,
+            "final_val_loss": 1.6743976049423217,
+            "final_val_accuracy": 60.7
+        },
+        "functional_test_error": {
+            "missing_metadata": true,
+            "error_type": "unknown_error",
+            "message": "stat: path should be string, bytes, os.PathLike or integer, not NoneType",
+            "solution": "请根据错误详情采取对应解决方案，必要时可尝试重新训练模型。"
+        }
+    },
+    {
+        "start_time": 1746268589.0538929,
+        "start_time_str": "2025-05-03 18:36:29",
+        "model_name": "MD_EFFICIENTNET_B3_15_64_10E04_0503_1836",
+        "strategy": "均衡推荐 (Balanced)",
+        "parameters": {
+            "model_name": "MD_EFFICIENTNET_B3_15_64_10E04_0503_1836",
+            "backbone": "efficientnet_b3",
+            "pretrained": true,
+            "epochs": 15,
+            "batch_size": 64,
+            "learning_rate": 0.0001,
+            "attribute_loss_weight": 1.0,
+            "anno_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Anno_fine",
+            "img_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Img/img_highres",
+            "num_workers": 4
+        },
+        "backbone": "efficientnet_b3",
+        "anno_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Anno_fine",
+        "img_dir": "/home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Img/img_highres",
+        "status": "已完成",
+        "total_epochs": 15,
+        "completed_epochs": 15,
+        "best_val_loss": 1.537361759185791,
+        "best_epoch": 2,
+        "best_model_path": "./models/MD_EFFICIENTNET_B3_15_64_10E04_0503_1836/best_model_MD_EFFICIENTNET_B3_15_64_10E04_0503_1836_epoch2.pth",
+        "diagnostic_summary": "### 🩺 训练诊断报告\n- **训练轮数:** 15 / 15\n- **最佳验证损失:** 1.5374 (出现在 Epoch 2)\n- **最终验证损失:** 2.2522\n- **最终验证准确率:** 63.20%\n- **收敛性:** ❌ 验证损失在最后5轮未能持续下降，可能已收敛或遇到瓶颈。\n- **过拟合风险:** 高 \n  - **损失差异:** 2.12 | **准确率差异:** 36.2%\n  - **原因:** 损失差异(2.12)大于0.5，准确率差异(36.2%)大于15%\n  - _建议: 增强正则化(增加dropout或权重衰减)、增加数据增强或缩小模型规模_",
+        "functional_test_result": "失败",
+        "end_time": 1746269698.5360816,
+        "end_time_str": "2025-05-03 18:54:58",
+        "duration": 1109.4821887016296,
+        "duration_str": "0:18:29",
+        "training_history": [
+            {
+                "epoch": 1,
+                "Train Loss": 2.507244448661804,
+                "Validation Loss": 1.7130444984436035,
+                "Train Accuracy (%)": 45.52857142857143,
+                "Validation Accuracy (%)": 61.05
+            },
+            {
+                "epoch": 2,
+                "Train Loss": 1.4673751585824149,
+                "Validation Loss": 1.537361759185791,
+                "Train Accuracy (%)": 66.08571428571429,
+                "Validation Accuracy (%)": 63.35
+            },
+            {
+                "epoch": 3,
+                "Train Loss": 1.0345760572978429,
+                "Validation Loss": 1.5487589435577394,
+                "Train Accuracy (%)": 76.67857142857143,
+                "Validation Accuracy (%)": 64.15
+            },
+            {
+                "epoch": 4,
+                "Train Loss": 0.6828768439292908,
+                "Validation Loss": 1.6621776885986328,
+                "Train Accuracy (%)": 86.85,
+                "Validation Accuracy (%)": 62.95
+            },
+            {
+                "epoch": 5,
+                "Train Loss": 0.4560295808655875,
+                "Validation Loss": 1.738796012878418,
+                "Train Accuracy (%)": 93.52142857142857,
+                "Validation Accuracy (%)": 63.55
+            },
+            {
+                "epoch": 6,
+                "Train Loss": 0.33636722312654765,
+                "Validation Loss": 1.8346103382110597,
+                "Train Accuracy (%)": 96.86428571428571,
+                "Validation Accuracy (%)": 64.65
+            },
+            {
+                "epoch": 7,
+                "Train Loss": 0.26900546738079617,
+                "Validation Loss": 1.9092367324829103,
+                "Train Accuracy (%)": 98.45,
+                "Validation Accuracy (%)": 62.75
+            },
+            {
+                "epoch": 8,
+                "Train Loss": 0.23078361030987332,
+                "Validation Loss": 1.98601473236084,
+                "Train Accuracy (%)": 99.21428571428571,
+                "Validation Accuracy (%)": 63.45
+            },
+            {
+                "epoch": 9,
+                "Train Loss": 0.20644567508356912,
+                "Validation Loss": 2.0171045188903807,
+                "Train Accuracy (%)": 99.31428571428572,
+                "Validation Accuracy (%)": 63.45
+            },
+            {
+                "epoch": 10,
+                "Train Loss": 0.1922924246447427,
+                "Validation Loss": 2.0994628677368166,
+                "Train Accuracy (%)": 99.36428571428571,
+                "Validation Accuracy (%)": 63.3
+            },
+            {
+                "epoch": 11,
+                "Train Loss": 0.17884392780917033,
+                "Validation Loss": 2.0856603584289553,
+                "Train Accuracy (%)": 99.44285714285714,
+                "Validation Accuracy (%)": 63.5
+            },
+            {
+                "epoch": 12,
+                "Train Loss": 0.16874097113949912,
+                "Validation Loss": 2.1380627098083496,
+                "Train Accuracy (%)": 99.37857142857143,
+                "Validation Accuracy (%)": 63.6
+            },
+            {
+                "epoch": 13,
+                "Train Loss": 0.16070230056558338,
+                "Validation Loss": 2.170448963165283,
+                "Train Accuracy (%)": 99.28571428571429,
+                "Validation Accuracy (%)": 64.2
+            },
+            {
+                "epoch": 14,
+                "Train Loss": 0.1429096509558814,
+                "Validation Loss": 2.2358681964874267,
+                "Train Accuracy (%)": 99.43571428571428,
+                "Validation Accuracy (%)": 63.45
+            },
+            {
+                "epoch": 15,
+                "Train Loss": 0.1342366796221052,
+                "Validation Loss": 2.252181818008423,
+                "Train Accuracy (%)": 99.42142857142858,
+                "Validation Accuracy (%)": 63.2
+            }
+        ],
+        "gpu_metrics_history": [
+            {
+                "step": 0,
+                "GPU Utilization (%)": 0,
+                "Memory Utilization (%)": 4.294903110242632
+            },
+            {
+                "step": 1,
+                "GPU Utilization (%)": 0,
+                "Memory Utilization (%)": 6.115911496498941
+            },
+            {
+                "step": 2,
+                "GPU Utilization (%)": 29,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 3,
+                "GPU Utilization (%)": 0,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 4,
+                "GPU Utilization (%)": 29,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 5,
+                "GPU Utilization (%)": 0,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 6,
+                "GPU Utilization (%)": 16,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 7,
+                "GPU Utilization (%)": 16,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 8,
+                "GPU Utilization (%)": 12,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 9,
+                "GPU Utilization (%)": 12,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 10,
+                "GPU Utilization (%)": 29,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 11,
+                "GPU Utilization (%)": 12,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 12,
+                "GPU Utilization (%)": 29,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 13,
+                "GPU Utilization (%)": 0,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 14,
+                "GPU Utilization (%)": 16,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 15,
+                "GPU Utilization (%)": 16,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 16,
+                "GPU Utilization (%)": 41,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 17,
+                "GPU Utilization (%)": 0,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 18,
+                "GPU Utilization (%)": 16,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 19,
+                "GPU Utilization (%)": 16,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 20,
+                "GPU Utilization (%)": 40,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 21,
+                "GPU Utilization (%)": 40,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 22,
+                "GPU Utilization (%)": 36,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 23,
+                "GPU Utilization (%)": 36,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 24,
+                "GPU Utilization (%)": 40,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 25,
+                "GPU Utilization (%)": 0,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 26,
+                "GPU Utilization (%)": 29,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 27,
+                "GPU Utilization (%)": 29,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 28,
+                "GPU Utilization (%)": 34,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 29,
+                "GPU Utilization (%)": 7,
+                "Memory Utilization (%)": 53.2336447646963
+            },
+            {
+                "step": 30,
+                "GPU Utilization (%)": 15,
+                "Memory Utilization (%)": 53.2336447646963
+            }
+        ],
+        "log_messages": [
+            "[18:36:29] 使用的训练参数: {'epochs': 15, 'batch_size': 64, 'learning_rate': 0.0001, 'device': 'cuda:0', 'model_save_path': './models/MD_EFFICIENTNET_B3_15_64_10E04_0503_1836', 'attribute_loss_weight': 1.0, 'num_workers': 4}",
+            "[18:36:29] 使用的骨干网络: efficientnet_b3",
+            "[18:36:29] Anno Dir Path: /home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Anno_fine",
+            "[18:36:29] Image Dir Path: /home/litata/xuke/DeepFashion/Category and Attribute Prediction Benchmark/Img/img_highres",
+            "[18:36:29] 已定义图像转换流程 (Resize, ToTensor, Normalize)",
+            "[18:36:29] 初始化训练数据集...",
+            "[18:36:29] 训练集加载成功，样本数: 14000",
+            "[18:36:29] 初始化验证数据集...",
+            "[18:36:29] 验证集加载成功，样本数: 2000",
+            "[18:36:29] 初始化模型 (Backbone: efficientnet_b3)...",
+            "[18:36:29] 模型初始化成功。将模型移动到设备: cuda:0",
+            "[18:36:30] 初始化 Trainer...",
+            "[18:36:30] Trainer 初始化成功.",
+            "[18:36:30] \n==================== 开始训练 ====================",
+            "[18:36:30] \n--- 开始训练 Epoch 1/15 ---",
+            "[18:37:34] --- Epoch 1 训练完成 (Avg Loss: 2.5072, Cat Acc: 45.53%) ---",
+            "[18:37:44] --- 验证完成 (Avg Loss: 1.7130, Cat Acc: 61.05%) ---",
+            "[18:37:44] 清理完成，共删除 0 个旧模型文件",
+            "[18:37:44] ** 新的最佳模型已保存到: ./models/MD_EFFICIENTNET_B3_15_64_10E04_0503_1836/best_model_MD_EFFICIENTNET_B3_15_64_10E04_0503_1836_epoch1.pth (Val Loss: 1.7130) **",
+            "[18:37:44] \n--- 开始训练 Epoch 2/15 ---",
+            "[18:38:49] --- Epoch 2 训练完成 (Avg Loss: 1.4674, Cat Acc: 66.09%) ---",
+            "[18:38:58] --- 验证完成 (Avg Loss: 1.5374, Cat Acc: 63.35%) ---",
+            "[18:38:59] 已删除旧的最佳模型: best_model_MD_EFFICIENTNET_B3_15_64_10E04_0503_1836_epoch1.pth",
+            "[18:38:59] 清理完成，共删除 1 个旧模型文件",
+            "[18:38:59] ** 新的最佳模型已保存到: ./models/MD_EFFICIENTNET_B3_15_64_10E04_0503_1836/best_model_MD_EFFICIENTNET_B3_15_64_10E04_0503_1836_epoch2.pth (Val Loss: 1.5374) **",
+            "[18:38:59] \n--- 开始训练 Epoch 3/15 ---",
+            "[18:40:02] --- Epoch 3 训练完成 (Avg Loss: 1.0346, Cat Acc: 76.68%) ---",
+            "[18:40:12] --- 验证完成 (Avg Loss: 1.5488, Cat Acc: 64.15%) ---",
+            "[18:40:13] \n--- 开始训练 Epoch 4/15 ---",
+            "[18:41:17] --- Epoch 4 训练完成 (Avg Loss: 0.6829, Cat Acc: 86.85%) ---",
+            "[18:41:27] --- 验证完成 (Avg Loss: 1.6622, Cat Acc: 62.95%) ---",
+            "[18:41:27] \n--- 开始训练 Epoch 5/15 ---",
+            "[18:42:31] --- Epoch 5 训练完成 (Avg Loss: 0.4560, Cat Acc: 93.52%) ---",
+            "[18:42:41] --- 验证完成 (Avg Loss: 1.7388, Cat Acc: 63.55%) ---",
+            "[18:42:41] \n--- 开始训练 Epoch 6/15 ---",
+            "[18:43:45] --- Epoch 6 训练完成 (Avg Loss: 0.3364, Cat Acc: 96.86%) ---",
+            "[18:43:55] --- 验证完成 (Avg Loss: 1.8346, Cat Acc: 64.65%) ---",
+            "[18:43:55] \n--- 开始训练 Epoch 7/15 ---",
+            "[18:44:58] --- Epoch 7 训练完成 (Avg Loss: 0.2690, Cat Acc: 98.45%) ---",
+            "[18:45:07] --- 验证完成 (Avg Loss: 1.9092, Cat Acc: 62.75%) ---",
+            "[18:45:08] \n--- 开始训练 Epoch 8/15 ---",
+            "[18:46:11] --- Epoch 8 训练完成 (Avg Loss: 0.2308, Cat Acc: 99.21%) ---",
+            "[18:46:21] --- 验证完成 (Avg Loss: 1.9860, Cat Acc: 63.45%) ---",
+            "[18:46:21] \n--- 开始训练 Epoch 9/15 ---",
+            "[18:47:27] --- Epoch 9 训练完成 (Avg Loss: 0.2064, Cat Acc: 99.31%) ---",
+            "[18:47:37] --- 验证完成 (Avg Loss: 2.0171, Cat Acc: 63.45%) ---",
+            "[18:47:37] \n--- 开始训练 Epoch 10/15 ---",
+            "[18:48:40] --- Epoch 10 训练完成 (Avg Loss: 0.1923, Cat Acc: 99.36%) ---",
+            "[18:48:50] --- 验证完成 (Avg Loss: 2.0995, Cat Acc: 63.30%) ---",
+            "[18:48:50] \n--- 开始训练 Epoch 11/15 ---",
+            "[18:49:54] --- Epoch 11 训练完成 (Avg Loss: 0.1788, Cat Acc: 99.44%) ---",
+            "[18:50:04] --- 验证完成 (Avg Loss: 2.0857, Cat Acc: 63.50%) ---",
+            "[18:50:04] \n--- 开始训练 Epoch 12/15 ---",
+            "[18:51:08] --- Epoch 12 训练完成 (Avg Loss: 0.1687, Cat Acc: 99.38%) ---",
+            "[18:51:18] --- 验证完成 (Avg Loss: 2.1381, Cat Acc: 63.60%) ---",
+            "[18:51:18] \n--- 开始训练 Epoch 13/15 ---",
+            "[18:52:22] --- Epoch 13 训练完成 (Avg Loss: 0.1607, Cat Acc: 99.29%) ---",
+            "[18:52:32] --- 验证完成 (Avg Loss: 2.1704, Cat Acc: 64.20%) ---",
+            "[18:52:32] \n--- 开始训练 Epoch 14/15 ---",
+            "[18:53:35] --- Epoch 14 训练完成 (Avg Loss: 0.1429, Cat Acc: 99.44%) ---",
+            "[18:53:45] --- 验证完成 (Avg Loss: 2.2359, Cat Acc: 63.45%) ---",
+            "[18:53:45] \n--- 开始训练 Epoch 15/15 ---",
+            "[18:54:48] --- Epoch 15 训练完成 (Avg Loss: 0.1342, Cat Acc: 99.42%) ---",
+            "[18:54:58] --- 验证完成 (Avg Loss: 2.2522, Cat Acc: 63.20%) ---",
+            "[18:54:58] 训练成功完成！",
+            "[18:54:58] 总训练时间: 1109.48 秒",
+            "[18:54:58] 最佳验证损失: 1.5374",
+            "[18:54:58] \n--- 诊断报告已生成 ---",
+            "[18:54:59] 功能测试失败: Traceback (most recent call last):\n  File \"/home/litata/xuke/ClothesTypeTrain4DF/components/report_generator.py\", line 339, in run_functional_test\n    if os.path.exists(metadata_file):\n  File \"/home/litata/apps/miniconda3/envs/miaoda_clothes/lib/python3.10/genericpath.py\", line 19, in exists\n    os.stat(path)\nTypeError: stat: path should be string, bytes, os.PathLike or integer, not NoneType\n",
+            "[18:54:59] \n--- 功能模拟测试 --- \n功能测试失败: unknown_error"
+        ],
+        "evaluation": {
+            "overfitting_risk": "高",
+            "loss_diff": 2.1179451383863177,
+            "accuracy_diff": 36.221428571428575,
+            "convergence_status": "已收敛或停滞",
+            "best_epoch": 2,
+            "best_val_loss": 1.537361759185791,
+            "final_val_loss": 2.252181818008423,
+            "final_val_accuracy": 63.2
+        },
+        "functional_test_error": {
+            "missing_metadata": true,
+            "error_type": "unknown_error",
+            "message": "stat: path should be string, bytes, os.PathLike or integer, not NoneType",
+            "solution": "请根据错误详情采取对应解决方案，必要时可尝试重新训练模型。"
+        }
     }
 ]

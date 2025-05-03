@@ -282,10 +282,12 @@ class Trainer:
                         if 1 <= attr_id <= max_id:
                             feature_names[attr_id-1] = attr_name
             except Exception as e:
-                print(f"[Trainer] 警告：从数据集获取类别/属性名称时出错: {e}")
-                # 出错时使用空列表
-                class_names = []
-                feature_names = []
+                # 直接暴露错误，不使用伪数据
+                error_msg = f"[Trainer] 错误：从数据集获取类别/属性名称时出错: {e}"
+                print(error_msg)
+                # 如果没有类别和属性名称，我们不应该继续生成元数据
+                if not class_names and not feature_names:
+                    raise ValueError(f"无法获取类别和属性名称: {e}")
             
             # 尝试从name_mapping.json加载中文名称映射
             try:
@@ -316,6 +318,13 @@ class Trainer:
             # 获取特征数量
             num_categories = len(class_names)
             
+            # 验证元数据的完整性
+            if num_categories == 0:
+                raise ValueError("模型元数据缺少必要的类别信息")
+            
+            if len(feature_names) == 0:
+                raise ValueError("模型元数据缺少必要的属性信息")
+            
             # 构建元数据 (使用英文key)
             metadata = {
                 "model_name": model_name,
@@ -340,7 +349,14 @@ class Trainer:
         
         except Exception as e:
             print(f"[Trainer] 错误：生成元数据文件时出错: {e}")
-            # 出错时返回None
+            
+            # 记录详细错误信息
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"[Trainer] 错误详情：\n{error_trace}")
+            
+            # 不再尝试生成紧急备份的伪元数据
+            # 直接返回None，让调用者知道元数据生成失败
             return None
 
     def train(self):
@@ -390,7 +406,9 @@ class Trainer:
                         
                         # 为最佳模型生成metadata.json文件
                         model_name = os.path.basename(self.model_save_path)
-                        self._save_metadata(model_name)
+                        metadata_path = self._save_metadata(model_name)
+                        if metadata_path is None:
+                            print(f"[Trainer] 警告：无法为最佳模型生成元数据文件")
                     except Exception as e:
                         print(f"错误：保存最佳模型时出错: {e}")
 
@@ -399,6 +417,23 @@ class Trainer:
         print("\n==================== 训练完成 ====================")
         print(f"训练时间总计: {total_time:.2f}秒 ({total_time/60:.2f}分钟)")
         print(f"最佳验证损失: {self.best_val_loss:.4f}")
+        
+        # 训练结束后，确保元数据文件存在
+        if self.model_save_path:
+            model_name = os.path.basename(self.model_save_path)
+            metadata_file = os.path.join(self.model_save_path, f"{model_name}_metadata.json")
+            
+            # 检查元数据文件是否存在，如果不存在则尝试生成
+            if not os.path.exists(metadata_file):
+                print(f"[Trainer] 训练结束时检测到元数据文件不存在")
+                print(f"[Trainer] 尝试生成元数据文件...")
+                metadata_path = self._save_metadata(model_name)
+                if metadata_path is None:
+                    print(f"[Trainer] 错误：训练结束时无法生成元数据文件")
+                    print(f"[Trainer] 请检查数据集是否包含正确的类别和属性信息")
+                    print(f"[Trainer] 功能测试将会失败，需要手动创建元数据文件")
+            else:
+                print(f"[Trainer] 元数据文件已存在: {metadata_file}")
         
         # 返回训练历史和最佳验证损失
         return self.history, self.best_val_loss
