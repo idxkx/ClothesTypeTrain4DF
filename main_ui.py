@@ -1,6 +1,7 @@
 # Placeholder for Streamlit UI code 
 
 # 解决PyTorch和Streamlit之间的兼容性问题
+import torch_patch  # 导入补丁
 import warnings
 import sys
 import os

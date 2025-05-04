@@ -5,138 +5,164 @@ import json
 import uuid
 import time
 import math
+from datetime import datetime
 
 from utils.file_utils import load_results, save_results
 from components.report_generator import generate_metadata_for_model
+from utils.time_utils import format_time_delta
 
-def display_history():
-    """显示历史训练记录"""
-    all_results = load_results()
+def load_record_sets():
+    """加载所有可用的记录集"""
+    record_sets = {}
+    record_sets_dir = "training_record_sets"
     
-    # 设置显示失败记录的选项
-    if "show_failed" not in st.session_state:
-        st.session_state.show_failed = False
+    if os.path.exists(record_sets_dir):
+        for file in os.listdir(record_sets_dir):
+            if file.endswith('.json'):
+                name = file[:-5]  # 移除.json后缀
+                try:
+                    with open(os.path.join(record_sets_dir, file), 'r', encoding='utf-8') as f:
+                        records = json.load(f)
+                    record_sets[name] = records
+                except Exception as e:
+                    st.warning(f"无法加载记录集 {name}: {e}")
+    
+    return record_sets
+
+def switch_to_record_set(name, records):
+    """切换到指定的记录集"""
+    try:
+        # 备份当前记录
+        backup_dir = "training_records_backup"
+        os.makedirs(backup_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_file = os.path.join(backup_dir, f"training_results_{timestamp}.json")
         
-    show_failed = st.checkbox(
-        "显示失败的训练记录", 
-        value=st.session_state.show_failed,
-        key="history_viewer_show_failed_checkbox",
-        help="勾选此项可显示状态为'失败'或'错误'的训练记录"
-    )
+        with open("training_results.json", 'r', encoding='utf-8') as f:
+            current_records = json.load(f)
+        
+        with open(backup_file, 'w', encoding='utf-8') as f:
+            json.dump(current_records, f, indent=4, ensure_ascii=False)
+        
+        # 切换到新记录集
+        with open("training_results.json", 'w', encoding='utf-8') as f:
+            json.dump(records, f, indent=4, ensure_ascii=False)
+        
+        return True, f"已切换到记录集: {name}"
+    except Exception as e:
+        return False, f"切换记录集失败: {e}"
+
+def display_record_sets_manager():
+    """显示记录集管理界面"""
+    st.subheader("📚 训练记录集管理")
     
-    # 更新会话状态
-    st.session_state.show_failed = show_failed
+    # 加载所有记录集
+    record_sets = load_record_sets()
     
-    if not all_results:
-        st.info("尚未有训练记录。开始一次训练后，结果将显示在这里。")
+    if not record_sets:
+        st.info("还没有创建任何记录集。记录集将在训练完成后自动创建。")
         return
-
-    # 转换数据以便更好地显示
-    display_data = []
-    for r in reversed(all_results):  # 显示最新的在前面
-        # 如果未勾选显示失败记录，则跳过失败的记录
-        if not st.session_state.show_failed and r.get("status", "").lower() in ["失败", "错误", "failed", "error"]:
-            continue
-
-        best_epoch_info = f"{r.get('best_val_loss', 'N/A'):.4f} @ E{r.get('best_epoch', 'N/A')}" if isinstance(r.get('best_val_loss'), (int, float)) else "N/A"
-        
-        # 获取过拟合风险评估
-        evaluation = r.get("evaluation", {})
-        overfitting_risk = evaluation.get("overfitting_risk", "未知")
-        loss_diff = evaluation.get("loss_diff", float('nan'))
-        acc_diff = evaluation.get("accuracy_diff", float('nan'))
-        
-        # 格式化过拟合指标
-        risk_display = overfitting_risk
-        if overfitting_risk == "高":
-            risk_display = f"⚠️ {overfitting_risk}"
-        elif overfitting_risk == "中":
-            risk_display = f"⚡ {overfitting_risk}"
-        elif overfitting_risk == "低":
-            risk_display = f"✅ {overfitting_risk}"
-            
-        # 差异指标显示
-        diff_display = f"损失: {loss_diff:.2f} | 准确率: {acc_diff:.1f}%" if not math.isnan(loss_diff) and not math.isnan(acc_diff) else "N/A"
-        
-        # 检查是否存在元数据文件
-        metadata_status = "⚠️ 未找到"
-        model_path = r.get("best_model_path", "")
-        metadata_file = None
-        if model_path and os.path.exists(model_path):
-            model_dir = os.path.dirname(model_path)
-            model_name = r.get("model_name", "")
-            if model_dir and model_name:  # 确保目录和名称都不为空
-                metadata_file = os.path.join(model_dir, f"{model_name}_metadata.json")
-                if metadata_file and os.path.exists(metadata_file):  # 添加对metadata_file的检查
-                    metadata_status = "✅ 已生成"
-        
-        display_data.append({
-            "完成时间": r.get("end_time_str", "N/A"),
-            "模型名称": r.get("model_name", "N/A"),
-            "策略": r.get("strategy", "N/A"),
-            "骨干网络": r.get("backbone", "N/A"),
-            "轮数": f"{r.get('completed_epochs', 'N/A')}/{r.get('total_epochs', 'N/A')}",
-            "最佳验证损失 (轮)": best_epoch_info,
-            "过拟合风险": risk_display,
-            "训练差异": diff_display,
-            "状态": r.get("status", "N/A").split('.')[0],  # 取第一句
-            "总耗时": r.get("duration_str", "N/A"),
-            "元数据": metadata_status,
-            "功能测试": r.get("functional_test_result", "未执行"),
-            "操作": {
-                "model_name": r.get("model_name", ""),
-                "metadata_exists": os.path.exists(metadata_file) if metadata_file else False,
-                "model_path": model_path,
-                "original_data": r  # 保存原始数据以供后续使用
-            }
-        })
-
-    if display_data:
-        # 创建DataFrame
-        results_df = pd.DataFrame(display_data)
-        
-        # 显示主表格（不包含操作列）
-        st.markdown("### 📋 历史训练记录")
-        display_cols = [col for col in results_df.columns if col != "操作"]
-        st.dataframe(
-            results_df[display_cols],
-            use_container_width=True,
-            hide_index=True
+    
+    # 创建两列布局
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # 显示记录集选择器
+        selected_set = st.selectbox(
+            "选择记录集",
+            options=list(record_sets.keys()),
+            format_func=lambda x: f"{x} ({len(record_sets[x])} 个模型记录)"
         )
         
-        # 显示操作区域
-        st.markdown("### ⚡ 快速操作")
-        
-        # 创建三列布局显示操作按钮
-        num_records = len(results_df)
-        cols_per_row = 3
-        num_rows = (num_records + cols_per_row - 1) // cols_per_row
-        
-        for row in range(num_rows):
-            cols = st.columns(cols_per_row)
-            for col in range(cols_per_row):
-                idx = row * cols_per_row + col
-                if idx < num_records:
-                    with cols[col]:
-                        record = results_df.iloc[idx]
-                        # 显示模型基本信息
-                        st.markdown(f"""
-                        **{record['模型名称']}**  
-                        训练时间: {record['完成时间']}  
-                        策略: {record['策略']}  
-                        状态: {record['状态']}
-                        """)
-                        # 显示操作按钮
-                        render_action_buttons(record)
-                        # 添加分隔线
-                        st.markdown("---")
+        if selected_set:
+            records = record_sets[selected_set]
+            st.write(f"记录集 '{selected_set}' 包含以下模型：")
+            
+            # 创建数据表格
+            if records:
+                df = pd.DataFrame(records)
+                if 'date_created' in df.columns:
+                    df['date_created'] = pd.to_datetime(df['date_created'], errors='coerce')
+                    df = df.sort_values('date_created', ascending=False)
+                
+                # 选择要显示的列
+                display_columns = [
+                    'model_name', 'backbone', 'completed_epochs',
+                    'date_created', 'learning_rate', 'status'
+                ]
+                display_columns = [col for col in display_columns if col in df.columns]
+                
+                st.dataframe(df[display_columns])
+            else:
+                st.info("此记录集为空")
+    
+    with col2:
+        # 切换记录集的按钮
+        if st.button(f"切换到 '{selected_set}'", key="switch_record_set"):
+            success, message = switch_to_record_set(selected_set, record_sets[selected_set])
+            if success:
+                st.success(message)
+                st.rerun()  # 重新加载页面以显示新记录
+            else:
+                st.error(message)
 
-        # 添加详细信息查看区域
-        if 'selected_model_for_details' in st.session_state and st.session_state.selected_model_for_details:
-            st.markdown("### 📊 训练详情查看")
-            show_model_details(st.session_state.selected_model_for_details, all_results)
-    else:
-        st.info("没有符合筛选条件的训练记录。")
+def display_history():
+    """显示训练历史记录"""
+    # 首先显示记录集管理器
+    display_record_sets_manager()
+    
+    st.markdown("---")
+    st.subheader("📊 当前训练记录")
+    
+    # 加载当前的训练记录
+    results = load_results()
+    
+    if not results:
+        st.info("还没有任何训练记录。")
+        return
+    
+    # 转换为DataFrame以便显示
+    df = pd.DataFrame(results)
+    
+    # 确保date_created列是datetime类型
+    if 'date_created' in df.columns:
+        df['date_created'] = pd.to_datetime(df['date_created'], errors='coerce')
+        df = df.sort_values('date_created', ascending=False)
+    
+    # 添加筛选选项
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        # 添加backbone筛选
+        if 'backbone' in df.columns:
+            backbones = ['全部'] + sorted(df['backbone'].unique().tolist())
+            selected_backbone = st.selectbox('选择backbone:', backbones)
+    
+    with col2:
+        # 显示失败记录的选项
+        show_failed = st.checkbox('显示失败的训练', value=st.session_state.get('show_failed', True))
+    
+    # 应用筛选
+    if selected_backbone != '全部':
+        df = df[df['backbone'] == selected_backbone]
+    if not show_failed:
+        df = df[df['status'] != 'failed']
+    
+    # 选择要显示的列
+    display_columns = [
+        'model_name', 'backbone', 'completed_epochs',
+        'date_created', 'learning_rate', 'status'
+    ]
+    display_columns = [col for col in display_columns if col in df.columns]
+    
+    # 显示数据表格
+    st.dataframe(df[display_columns])
+    
+    # 显示详细信息
+    if len(df) > 0:
+        st.markdown("### 📝 详细信息")
+        for _, row in df.iterrows():
+            with st.expander(f"🔍 {row['model_name']}"):
+                st.json(row.to_dict())
 
 def delete_training_record(model_name, results_file="training_results.json"):
     """删除指定的训练记录

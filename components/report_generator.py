@@ -7,7 +7,7 @@ import traceback
 import pandas as pd
 from datetime import datetime
 import re
-
+from utils.file_utils import load_results
 from utils.state_manager import append_log
 
 def generate_diagnostic_report(history_df, best_val_loss, total_epochs):
