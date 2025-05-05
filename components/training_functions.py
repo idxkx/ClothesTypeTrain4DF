@@ -119,14 +119,13 @@ def _initialize_run_result(training_params, device):
     return {
         "start_time": st.session_state.training_start_time,
         "start_time_str": datetime.fromtimestamp(st.session_state.training_start_time).strftime('%Y-%m-%d %H:%M:%S'),
-        "date_created": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         "model_name": training_params['model_name'],
         "strategy": training_params['strategy_choice'],
         "parameters": {k: v for k, v in training_params.items() if k != 'strategy_choice'},
         "backbone": training_params['backbone'],
         "anno_dir": training_params['anno_dir'],
         "img_dir": training_params['img_dir'],
-        "status": "ongoing",
+        "status": "进行中",
         "total_epochs": training_params['epochs'],
         "completed_epochs": 0,
         "best_val_loss": float('inf'),
@@ -140,7 +139,7 @@ def _initialize_run_result(training_params, device):
         "duration_str": None,
     }
 
-def _execute_training(trainer, device, gpu_index, ui_components, current_run_result, results_file):
+def _execute_training(trainer, device, gpu_index, ui_components, current_run_result):
     """执行训练循环"""
     append_log("\n==================== 开始训练 ====================")
     ui_components['status'].info(f"🚀 模型训练中... 设备: {device}")
@@ -159,15 +158,6 @@ def _execute_training(trainer, device, gpu_index, ui_components, current_run_res
                 append_log("训练被用户中断。")
                 ui_components['status'].warning("⚠️ 训练已停止。")
                 training_interrupted = True
-                # 新增：中断时写入状态和时间
-                current_run_result["status"] = "failed"
-                if not current_run_result.get("date_created"):
-                    current_run_result["date_created"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                all_results = load_results(results_file)
-                all_results = [r for r in all_results if r.get('model_name') != current_run_result['model_name']]
-                all_results.append(current_run_result)
-                save_results(all_results, results_file)
-                append_log(f"训练被中断，已保存记录到 {results_file}")
                 break
             
             ui_components['status'].info(f"Epoch {epoch+1}/{trainer.epochs}: 正在训练...")
@@ -184,15 +174,6 @@ def _execute_training(trainer, device, gpu_index, ui_components, current_run_res
             if st.session_state.get('stop_requested', False):
                 append_log("训练在批次处理中被中断...")
                 training_interrupted = True
-                # 新增：中断时写入状态和时间
-                current_run_result["status"] = "failed"
-                if not current_run_result.get("date_created"):
-                    current_run_result["date_created"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                all_results = load_results(results_file)
-                all_results = [r for r in all_results if r.get('model_name') != current_run_result['model_name']]
-                all_results.append(current_run_result)
-                save_results(all_results, results_file)
-                append_log(f"训练被中断，已保存记录到 {results_file}")
                 break
             
             # 验证阶段
@@ -233,24 +214,15 @@ def _execute_training(trainer, device, gpu_index, ui_components, current_run_res
             
             # 更新完成轮数
             current_run_result["completed_epochs"] = epoch + 1
-            
-            # 每轮结束后保存训练记录
-            all_results = load_results(results_file)
-            # 移除之前的相同模型记录（如果存在）
-            all_results = [r for r in all_results if r.get('model_name') != current_run_result['model_name']]
-            # 添加当前记录
-            all_results.append(current_run_result)
-            save_results(all_results, results_file)
-            append_log(f"已保存当前训练进度到 {results_file}")
         
         # 训练完成，设置状态
         training_success = not training_interrupted
         
         if training_success:
-            current_run_result["status"] = "completed"
+            current_run_result["status"] = "已完成"
             append_log("训练成功完成！")
         else:
-            current_run_result["status"] = "failed"
+            current_run_result["status"] = "已中断"
             append_log("训练被中断！")
         
         # 构建历史DataFrame
@@ -264,15 +236,8 @@ def _execute_training(trainer, device, gpu_index, ui_components, current_run_res
         append_log(error_msg)
         ui_components['status'].error("❌ 训练失败！")
         traceback.print_exc()
-        current_run_result["status"] = "failed"
-        if not current_run_result.get("date_created"):
-            current_run_result["date_created"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        # 即使发生错误也保存训练记录
-        all_results = load_results(results_file)
-        all_results = [r for r in all_results if r.get('model_name') != current_run_result['model_name']]
-        all_results.append(current_run_result)
-        save_results(all_results, results_file)
-        append_log(f"已保存训练错误记录到 {results_file}")
+        
+        current_run_result["status"] = "错误"
         return False, float('inf'), None
 
 def _train_epoch(trainer, epoch, ui_components):
@@ -497,10 +462,10 @@ def _finalize_training(training_success, history_df, best_val_loss, model_save_d
     
     # 确保训练状态为成功，无论功能测试是否通过
     if training_success:
-        current_run_result["status"] = "completed"
+        current_run_result["status"] = "已完成"
         append_log("训练成功完成！")
     else:
-        current_run_result["status"] = "failed"
+        current_run_result["status"] = "失败"
         append_log("训练过程中出现错误。")
     
     # 执行功能测试，但不影响训练成功状态
@@ -516,7 +481,7 @@ def _finalize_training(training_success, history_df, best_val_loss, model_save_d
             ui_components['functional_test'].warning("请手动创建元数据文件后再进行功能测试，或使用fix_metadata.py工具")
             
             # 设置功能测试结果为失败，并提供详细原因
-            current_run_result["functional_test_result"] = "failed"
+            current_run_result["functional_test_result"] = "失败"
             current_run_result["functional_test_error"] = {
                 "error_type": "missing_metadata",
                 "message": f"元数据文件不存在: {metadata_file}",
@@ -552,7 +517,7 @@ def _finalize_training(training_success, history_df, best_val_loss, model_save_d
             
         log_summary = "功能测试成功" if test_success else f"功能测试失败: {error_details.get('error_type', '未知错误')}"
         append_log(f"\n--- 功能模拟测试 --- \n{log_summary}")
-        current_run_result["functional_test_result"] = "success" if test_success else "failed"
+        current_run_result["functional_test_result"] = "成功" if test_success else "失败"
         # 添加错误详情到训练结果
         if not test_success:
             current_run_result["functional_test_error"] = error_details
@@ -560,11 +525,11 @@ def _finalize_training(training_success, history_df, best_val_loss, model_save_d
         if not current_run_result.get("best_model_path"):
             ui_components['functional_test'].warning("未找到有效的最佳模型路径，跳过功能测试。")
             append_log("未找到有效的最佳模型路径，跳过功能测试。")
-            current_run_result["functional_test_result"] = "skipped (no model path)"
+            current_run_result["functional_test_result"] = "跳过 (无模型路径)"
         elif not os.path.exists(current_run_result["best_model_path"]):
             ui_components['functional_test'].warning("模型文件不存在，跳过功能测试。")
             append_log(f"模型文件不存在: {current_run_result['best_model_path']}，跳过功能测试。")
-            current_run_result["functional_test_result"] = "skipped (model file not found)"
+            current_run_result["functional_test_result"] = "跳过 (模型文件不存在)"
     
     # 保存当前运行结果
     all_results = load_results(results_file)

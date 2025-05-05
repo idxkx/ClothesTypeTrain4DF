@@ -142,7 +142,7 @@ def _run_training_pipeline(training_params, args, transforms_config,
     
     training_success, best_val_loss, history_df = _execute_training(
         trainer, selected_device, selected_gpu_index,
-        ui_components, current_run_result, results_file
+        ui_components, current_run_result
     )
     
     # 完成后处理
