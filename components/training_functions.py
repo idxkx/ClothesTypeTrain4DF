@@ -417,132 +417,98 @@ def _save_best_model(trainer, model_name, epoch, val_loss):
 def _finalize_training(training_success, history_df, best_val_loss, model_save_dir, 
                       training_params, current_run_result, ui_components, device, results_file):
     """完成训练后的收尾工作"""
-    # 计算总训练时间
-    end_time = time.time()
-    total_time = end_time - current_run_result["start_time"]
-    
-    # 更新结果记录
-    current_run_result["end_time"] = end_time
-    current_run_result["end_time_str"] = datetime.fromtimestamp(end_time).strftime('%Y-%m-%d %H:%M:%S')
-    current_run_result["duration"] = total_time
-    current_run_result["duration_str"] = format_time_delta(total_time)
-    
-    # 记录最终日志
-    append_log(f"总训练时间: {total_time:.2f} 秒")
-    formatted_best_loss = f"{best_val_loss:.4f}" if math.isfinite(best_val_loss) else "N/A"
-    append_log(f"最佳验证损失: {formatted_best_loss}")
-    
-    # 保存训练数据
-    current_run_result = _save_training_data(current_run_result)
-    
-    # 显示最终时间信息
-    _show_final_time_info(total_time, ui_components['time_info'])
-    
-    # 确保最后一次更新日志
-    ui_components['log'].code("\n".join(st.session_state.log_messages), language='log')
-    
-    # 生成诊断报告
-    if history_df is not None and not history_df.empty:
-        from components.report_generator import generate_diagnostic_report
-        diagnostic_report, evaluation_data = generate_diagnostic_report(history_df, best_val_loss, training_params['epochs'])
-        ui_components['diagnostic'].markdown(diagnostic_report)
-        append_log("\n--- 诊断报告已生成 ---")
+    try:
+        # 计算总训练时间
+        end_time = time.time()
+        total_time = end_time - current_run_result["start_time"]
         
-        # 保存诊断报告文本和结构化评估数据
-        current_run_result["diagnostic_summary"] = diagnostic_report
-        current_run_result["evaluation"] = evaluation_data  # 添加结构化评估数据
-    else:
-        current_run_result["diagnostic_summary"] = "无训练历史数据"
-        current_run_result["evaluation"] = {
-            "overfitting_risk": "未知",
-            "loss_diff": float('nan'),
-            "accuracy_diff": float('nan'),
-            "convergence_status": "未知"
-        }
-    
-    # 确保训练状态为成功，无论功能测试是否通过
-    if training_success:
-        current_run_result["status"] = "已完成"
-        append_log("训练成功完成！")
-    else:
-        current_run_result["status"] = "失败"
-        append_log("训练过程中出现错误。")
-    
-    # 执行功能测试，但不影响训练成功状态
-    test_success = False
-    if current_run_result.get("best_model_path") and os.path.exists(current_run_result["best_model_path"]):
-        # 先确认元数据文件是否存在
-        model_name = training_params['model_name']
-        metadata_file = os.path.join(model_save_dir, f"{model_name}_metadata.json")
+        # 更新结果记录
+        current_run_result["end_time"] = end_time
+        current_run_result["end_time_str"] = datetime.fromtimestamp(end_time).strftime('%Y-%m-%d %H:%M:%S')
+        current_run_result["duration"] = total_time
+        current_run_result["duration_str"] = format_time_delta(total_time)
         
-        if not os.path.exists(metadata_file):
-            ui_components['functional_test'].error(f"元数据文件不存在: {metadata_file}")
-            append_log(f"元数据文件不存在: {metadata_file}，功能测试将失败")
-            ui_components['functional_test'].warning("请手动创建元数据文件后再进行功能测试，或使用fix_metadata.py工具")
+        # 记录最终日志
+        append_log(f"总训练时间: {total_time:.2f} 秒")
+        formatted_best_loss = f"{best_val_loss:.4f}" if math.isfinite(best_val_loss) else "N/A"
+        append_log(f"最佳验证损失: {formatted_best_loss}")
+        
+        # 保存训练数据
+        current_run_result = _save_training_data(current_run_result)
+        
+        # 显示最终时间信息
+        _show_final_time_info(total_time, ui_components['time_info'])
+        
+        # 确保最后一次更新日志
+        ui_components['log'].code("\n".join(st.session_state.log_messages), language='log')
+        
+        # 生成诊断报告
+        if history_df is not None and not history_df.empty:
+            from components.report_generator import generate_diagnostic_report
+            diagnostic_report, evaluation_data = generate_diagnostic_report(history_df, best_val_loss, training_params['epochs'])
+            ui_components['diagnostic'].markdown(diagnostic_report)
+            append_log("\n--- 诊断报告已生成 ---")
             
-            # 设置功能测试结果为失败，并提供详细原因
-            current_run_result["functional_test_result"] = "失败"
-            current_run_result["functional_test_error"] = {
-                "error_type": "missing_metadata",
-                "message": f"元数据文件不存在: {metadata_file}",
-                "solution": "请手动创建元数据文件或使用fix_metadata.py工具"
+            # 保存诊断报告文本和结构化评估数据
+            current_run_result["diagnostic_summary"] = diagnostic_report
+            current_run_result["evaluation"] = evaluation_data
+        else:
+            current_run_result["diagnostic_summary"] = "无训练历史数据"
+            current_run_result["evaluation"] = {
+                "overfitting_risk": "未知",
+                "loss_diff": float('nan'),
+                "accuracy_diff": float('nan'),
+                "convergence_status": "未知"
             }
-            return
         
-        # 执行功能测试
-        from components.report_generator import run_functional_test
-        model_config = {
-            'num_categories': 50,  # 假设类别数为50
-            'backbone': training_params['backbone']
-        }
-        test_report, test_success, error_details = run_functional_test(
-            model_save_dir, training_params['model_name'], model_config, device
-        )
-        ui_components['functional_test'].markdown(test_report)
+        # 确保训练状态为成功，无论功能测试是否通过
+        if training_success:
+            current_run_result["status"] = "已完成"
+            append_log("训练成功完成！")
+            ui_components['status'].success("✅ 训练已完成")
+        else:
+            current_run_result["status"] = "失败"
+            append_log("训练过程中出现错误。")
+            ui_components['status'].error("❌ 训练失败")
         
-        if not test_success and error_details:
-            # 添加错误详情到测试报告中
-            error_solution = error_details.get("solution", "请尝试重新训练模型或联系技术支持。")
-            error_message = error_details.get("message", "未知错误")
-            error_type = error_details.get("error_type", "unknown")
+        # 保存训练记录到文件
+        try:
+            # 读取现有记录
+            existing_records = load_results(results_file)
+            if not isinstance(existing_records, list):
+                existing_records = []
             
-            # 构建详细错误信息
-            error_info = f"""
-            ### ❌ 功能测试失败详情
-            - **错误类型**: {error_type}
-            - **错误信息**: {error_message}
-            - **建议解决方案**: {error_solution}
-            """
-            ui_components['functional_test'].error(error_info)
+            # 更新或添加当前记录
+            record_updated = False
+            for i, record in enumerate(existing_records):
+                if record.get("model_name") == current_run_result.get("model_name"):
+                    existing_records[i] = current_run_result
+                    record_updated = True
+                    break
             
-        log_summary = "功能测试成功" if test_success else f"功能测试失败: {error_details.get('error_type', '未知错误')}"
-        append_log(f"\n--- 功能模拟测试 --- \n{log_summary}")
-        current_run_result["functional_test_result"] = "成功" if test_success else "失败"
-        # 添加错误详情到训练结果
-        if not test_success:
-            current_run_result["functional_test_error"] = error_details
-    else:
-        if not current_run_result.get("best_model_path"):
-            ui_components['functional_test'].warning("未找到有效的最佳模型路径，跳过功能测试。")
-            append_log("未找到有效的最佳模型路径，跳过功能测试。")
-            current_run_result["functional_test_result"] = "跳过 (无模型路径)"
-        elif not os.path.exists(current_run_result["best_model_path"]):
-            ui_components['functional_test'].warning("模型文件不存在，跳过功能测试。")
-            append_log(f"模型文件不存在: {current_run_result['best_model_path']}，跳过功能测试。")
-            current_run_result["functional_test_result"] = "跳过 (模型文件不存在)"
-    
-    # 保存当前运行结果
-    all_results = load_results(results_file)
-    all_results.append(current_run_result)
-    save_results(all_results, results_file)
-    append_log(f"当前训练结果已追加到 {results_file}")
-    
-    from components.history_viewer import display_history
-    display_history()
-    
-    # 清理GPU监控
-    from components.gpu_monitor import shutdown_gpu
-    shutdown_gpu()
+            if not record_updated:
+                existing_records.append(current_run_result)
+            
+            # 保存更新后的记录
+            save_results(existing_records, results_file)
+            append_log("训练记录已保存")
+        except Exception as e:
+            error_msg = f"保存训练记录时出错: {e}"
+            st.error(error_msg)
+            append_log(error_msg)
+            traceback.print_exc()
+        
+        # 更新进度条到完成状态
+        ui_components['progress'].progress(1.0)
+        
+    except Exception as e:
+        error_msg = f"完成训练过程时出错: {e}"
+        st.error(error_msg)
+        append_log(error_msg)
+        traceback.print_exc()
+        # 确保UI显示错误状态
+        ui_components['status'].error("❌ 训练完成过程出错")
+        ui_components['progress'].progress(1.0)
 
 def _save_training_data(current_run_result):
     """保存训练过程中的数据"""

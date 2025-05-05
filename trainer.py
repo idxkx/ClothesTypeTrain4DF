@@ -10,14 +10,13 @@ import math
 import json
 from datetime import datetime
 
-# 导入我们之前定义的类
-# 假设 dataset.py 和 model.py 在同一个目录下
-# 添加错误处理和占位符，以便在导入失败时仍能进行基本测试
+# 导入我们之前定义的类和工具函数
 try:
     from dataset import DeepFashionDataset
     from model import ClothesModel
+    from utils.file_utils import load_results, save_results
 except ImportError:
-    print("警告：无法直接导入 dataset 或 model。请确保 trainer.py 与它们在同一目录或正确配置了 PYTHONPATH。")
+    print("警告：无法直接导入必要模块。请确保所有依赖模块在正确的位置。")
     from torch.utils.data import Dataset
     from torch.utils.data import Subset # 用于创建小数据集测试
     class DummyDataset(Dataset):
@@ -360,83 +359,155 @@ class Trainer:
             return None
 
     def train(self):
-        """执行完整的训练流程"""
-        print("\n==================== 开始训练 ====================")
-        start_train_time = time.time()
-
-        for epoch in range(self.epochs):
-            train_loss, train_cat_acc = self._train_epoch(epoch)
-            val_loss, val_cat_acc = self._validate_epoch(epoch)
-
-            # 记录历史数据
-            self.history['train_loss'].append(train_loss)
-            self.history['val_loss'].append(val_loss)
-            self.history['train_cat_acc'].append(train_cat_acc)
-            self.history['val_cat_acc'].append(val_cat_acc)
-
-            # 计算训练时间
-            epoch_time = time.time() - start_train_time
-            avg_time_per_epoch = epoch_time / (epoch + 1)
-            remaining_epochs = self.epochs - (epoch + 1)
-            estimated_remaining_time = avg_time_per_epoch * remaining_epochs
-
-            # 打印本轮结果
-            print("\n--- 训练摘要 ---")
-            print(f"Epoch {epoch+1}/{self.epochs} - 耗时: {epoch_time:.2f}s (估计剩余: {estimated_remaining_time:.2f}s)")
-            print(f"  训练损失: {train_loss:.4f}, 类别准确率: {train_cat_acc:.2f}%")
-            print(f"  验证损失: {val_loss:.4f}, 类别准确率: {val_cat_acc:.2f}%")
-
-            # 保存最佳模型
-            if self.model_save_path:
-                # 始终保存最新的模型
-                latest_model_file = os.path.join(self.model_save_path, f"latest_model_epoch{epoch+1}.pth")
-                try:
-                    torch.save(self.model.state_dict(), latest_model_file)
-                    print(f"最新模型已保存: {latest_model_file}")
-                except Exception as e:
-                    print(f"错误：保存最新模型时出错: {e}")
-
-                # 保存性能最佳的模型
+        """执行完整的训练过程"""
+        print(f"\n=== 开始训练 ===")
+        print(f"模型: {self.model.__class__.__name__}")
+        print(f"训练集大小: {len(self.train_dataset)}")
+        print(f"验证集大小: {len(self.val_dataset)}")
+        print(f"批次大小: {self.args.get('batch_size')}")
+        print(f"学习率: {self.args.get('learning_rate')}")
+        print(f"设备: {self.device}")
+        
+        start_time = time.time()
+        best_model_path = None
+        training_record = {
+            "model_name": self.args.get("model_name", "unnamed_model"),
+            "backbone": self.args.get("backbone", "unknown"),
+            "image_size": self.args.get("image_size", 224),
+            "batch_size": self.args.get("batch_size", 32),
+            "learning_rate": self.args.get("learning_rate", 0.0001),
+            "num_categories": self.args.get("num_categories", 13),
+            "total_epochs": self.epochs,
+            "completed_epochs": 0,
+            "best_val_loss": float('inf'),
+            "best_val_accuracy": 0.0,
+            "best_epoch": 0,
+            "date_created": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "status": "training",
+            "best_model_path": ""
+        }
+        
+        try:
+            for epoch in range(self.epochs):
+                epoch_start_time = time.time()
+                
+                # 训练和验证
+                train_loss, train_cat_acc = self._train_epoch(epoch)
+                val_loss, val_cat_acc = self._validate_epoch(epoch)
+                
+                # 更新历史记录
+                self.history['train_loss'].append(train_loss)
+                self.history['val_loss'].append(val_loss)
+                self.history['train_cat_acc'].append(train_cat_acc)
+                self.history['val_cat_acc'].append(val_cat_acc)
+                
+                # 更新训练记录
+                training_record["completed_epochs"] = epoch + 1
+                
+                # 检查是否是最佳模型
                 if val_loss < self.best_val_loss:
                     self.best_val_loss = val_loss
-                    best_model_file = os.path.join(self.model_save_path, f"best_model_epoch{epoch+1}.pth")
-                    try:
-                        torch.save(self.model.state_dict(), best_model_file)
-                        print(f"新的最佳模型已保存: {best_model_file} (验证损失: {val_loss:.4f})")
-                        
-                        # 为最佳模型生成metadata.json文件
-                        model_name = os.path.basename(self.model_save_path)
-                        metadata_path = self._save_metadata(model_name)
-                        if metadata_path is None:
-                            print(f"[Trainer] 警告：无法为最佳模型生成元数据文件")
-                    except Exception as e:
-                        print(f"错误：保存最佳模型时出错: {e}")
-
-        # 训练完成
-        total_time = time.time() - start_train_time
-        print("\n==================== 训练完成 ====================")
-        print(f"训练时间总计: {total_time:.2f}秒 ({total_time/60:.2f}分钟)")
-        print(f"最佳验证损失: {self.best_val_loss:.4f}")
-        
-        # 训练结束后，确保元数据文件存在
-        if self.model_save_path:
-            model_name = os.path.basename(self.model_save_path)
-            metadata_file = os.path.join(self.model_save_path, f"{model_name}_metadata.json")
+                    training_record["best_val_loss"] = val_loss
+                    training_record["best_val_accuracy"] = val_cat_acc
+                    training_record["best_epoch"] = epoch + 1
+                    
+                    # 保存最佳模型
+                    if self.model_save_path:
+                        model_name = training_record["model_name"]
+                        best_model_path = os.path.join(
+                            self.model_save_path,
+                            f"best_model_{model_name}_epoch{epoch+1}.pth"
+                        )
+                        torch.save(self.model.state_dict(), best_model_path)
+                        training_record["best_model_path"] = best_model_path
+                        print(f"保存最佳模型到: {best_model_path}")
+                
+                # 打印轮次总结
+                epoch_time = time.time() - epoch_start_time
+                print(f"\nEpoch {epoch+1}/{self.epochs} 总结:")
+                print(f"训练损失: {train_loss:.4f} | 训练类别准确率: {train_cat_acc:.2f}%")
+                print(f"验证损失: {val_loss:.4f} | 验证类别准确率: {val_cat_acc:.2f}%")
+                print(f"轮次用时: {epoch_time:.2f}s")
+                
+                # 保存当前训练记录
+                try:
+                    # 读取现有记录
+                    existing_records = load_results("training_results.json")
+                    if not isinstance(existing_records, list):
+                        existing_records = []
+                    
+                    # 更新或添加当前记录
+                    record_updated = False
+                    for i, record in enumerate(existing_records):
+                        if record.get("model_name") == training_record["model_name"]:
+                            existing_records[i] = training_record
+                            record_updated = True
+                            break
+                    
+                    if not record_updated:
+                        existing_records.append(training_record)
+                    
+                    # 保存更新后的记录
+                    save_results(existing_records, "training_results.json")
+                except Exception as e:
+                    print(f"警告：保存训练记录时出错: {e}")
             
-            # 检查元数据文件是否存在，如果不存在则尝试生成
-            if not os.path.exists(metadata_file):
-                print(f"[Trainer] 训练结束时检测到元数据文件不存在")
-                print(f"[Trainer] 尝试生成元数据文件...")
-                metadata_path = self._save_metadata(model_name)
-                if metadata_path is None:
-                    print(f"[Trainer] 错误：训练结束时无法生成元数据文件")
-                    print(f"[Trainer] 请检查数据集是否包含正确的类别和属性信息")
-                    print(f"[Trainer] 功能测试将会失败，需要手动创建元数据文件")
-            else:
-                print(f"[Trainer] 元数据文件已存在: {metadata_file}")
-        
-        # 返回训练历史和最佳验证损失
-        return self.history, self.best_val_loss
+            # 训练完成，更新状态
+            training_record["status"] = "completed"
+            total_time = time.time() - start_time
+            print(f"\n=== 训练完成 ===")
+            print(f"总用时: {total_time:.2f}s")
+            print(f"最佳验证损失: {self.best_val_loss:.4f} (Epoch {training_record['best_epoch']})")
+            if best_model_path:
+                print(f"最佳模型保存在: {best_model_path}")
+            
+            # 保存最终训练记录
+            try:
+                existing_records = load_results("training_results.json")
+                if not isinstance(existing_records, list):
+                    existing_records = []
+                
+                # 更新或添加最终记录
+                record_updated = False
+                for i, record in enumerate(existing_records):
+                    if record.get("model_name") == training_record["model_name"]:
+                        existing_records[i] = training_record
+                        record_updated = True
+                        break
+                
+                if not record_updated:
+                    existing_records.append(training_record)
+                
+                save_results(existing_records, "training_results.json")
+            except Exception as e:
+                print(f"警告：保存最终训练记录时出错: {e}")
+            
+            return self.history
+            
+        except Exception as e:
+            print(f"训练过程中出错: {e}")
+            training_record["status"] = "failed"
+            try:
+                # 保存失败记录
+                existing_records = load_results("training_results.json")
+                if not isinstance(existing_records, list):
+                    existing_records = []
+                
+                # 更新或添加失败记录
+                record_updated = False
+                for i, record in enumerate(existing_records):
+                    if record.get("model_name") == training_record["model_name"]:
+                        existing_records[i] = training_record
+                        record_updated = True
+                        break
+                
+                if not record_updated:
+                    existing_records.append(training_record)
+                
+                save_results(existing_records, "training_results.json")
+            except Exception as save_error:
+                print(f"警告：保存失败记录时出错: {save_error}")
+            raise  # 重新抛出异常
 
 # --- 仅用于测试 ---
 if __name__ == "__main__":
@@ -461,7 +532,7 @@ if __name__ == "__main__":
         trainer = Trainer(model, train_ds, val_ds, args)
         
         # 执行训练
-        history, best_val_loss = trainer.train()
+        history = trainer.train()
         
         print("\n--- 训练历史摘要 ---")
         for epoch in range(len(history['train_loss'])):

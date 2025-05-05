@@ -19,68 +19,88 @@ from components.report_generator import generate_diagnostic_report, run_function
 def start_training_process(training_params, selected_device, selected_gpu_index, 
                           ui_components, anno_dir, img_dir, results_file):
     """启动训练流程"""
-    # 检查GPU设备是否有效
-    if selected_device is None or not selected_device.startswith('cuda'):
-        error_msg = "错误：必须选择一个有效的 GPU 设备才能开始训练。请检查侧边栏的设备选择。"
-        st.error(error_msg)
-        append_log(error_msg)
-        ui_components['status'].error("❌ 训练无法开始：未选择有效 GPU。")
-        return
-    
-    # 重置训练状态
-    reset_training_state()
-    
-    # 清空UI显示区域
-    for key in ['diagnostic', 'functional_test', 'time_info']:
-        if key in ui_components:
-            ui_components[key].empty()
-    
-    # 初始化显示
-    ui_components['status'].info("⏳ 正在准备训练环境...")
-    ui_components['progress'].progress(0.0)
-    ui_components['epoch_info'].empty()
-    ui_components['log'].code("\n".join(st.session_state.log_messages), language='log')
-    
-    # 更新GPU监控
-    if selected_gpu_index is not None:
-        update_gpu_info(selected_gpu_index, ui_components['gpu_info'], ui_components['gpu_charts'])
-    
-    # 准备模型保存目录
-    model_name = training_params['model_name']
-    model_save_dir = get_model_save_dir(model_name)
-    ensure_dir_exists(model_save_dir)
-    
-    # 收集训练参数
-    args = {
-        'epochs': training_params['epochs'],
-        'batch_size': training_params['batch_size'],
-        'learning_rate': training_params['learning_rate'],
-        'device': selected_device,
-        'model_save_path': model_save_dir,
-        'attribute_loss_weight': training_params['attribute_loss_weight'],
-        'num_workers': training_params['num_workers']
-    }
-    
-    append_log(f"使用的训练参数: {args}")
-    append_log(f"使用的骨干网络: {training_params['backbone']}")
-    append_log(f"Anno Dir Path: {anno_dir}")
-    append_log(f"Image Dir Path: {img_dir}")
-    
-    # 定义图像转换
-    transforms_config = _prepare_transforms()
-    
-    # 运行训练过程
     try:
-        _run_training_pipeline(
-            training_params, args, transforms_config, 
-            anno_dir, img_dir, model_save_dir, selected_device, selected_gpu_index,
-            ui_components, results_file
-        )
+        # 检查GPU设备是否有效
+        if selected_device is None or not selected_device.startswith('cuda'):
+            error_msg = "错误：必须选择一个有效的 GPU 设备才能开始训练。请检查侧边栏的设备选择。"
+            st.error(error_msg)
+            append_log(error_msg)
+            ui_components['status'].error("❌ 训练无法开始：未选择有效 GPU。")
+            return
+        
+        # 重置训练状态
+        reset_training_state()
+        
+        # 清空UI显示区域
+        for key in ['diagnostic', 'functional_test', 'time_info']:
+            if key in ui_components:
+                ui_components[key].empty()
+        
+        # 初始化显示
+        ui_components['status'].info("⏳ 正在准备训练环境...")
+        ui_components['progress'].progress(0.0)
+        ui_components['epoch_info'].empty()
+        ui_components['log'].code("\n".join(st.session_state.log_messages), language='log')
+        
+        # 更新GPU监控
+        if selected_gpu_index is not None:
+            update_gpu_info(selected_gpu_index, ui_components['gpu_info'], ui_components['gpu_charts'])
+        
+        # 准备模型保存目录
+        model_name = training_params['model_name']
+        model_save_dir = get_model_save_dir(model_name)
+        ensure_dir_exists(model_save_dir)
+        
+        # 收集训练参数
+        args = {
+            'epochs': training_params['epochs'],
+            'batch_size': training_params['batch_size'],
+            'learning_rate': training_params['learning_rate'],
+            'device': selected_device,
+            'model_save_path': model_save_dir,
+            'attribute_loss_weight': training_params['attribute_loss_weight'],
+            'num_workers': training_params['num_workers']
+        }
+        
+        append_log(f"使用的训练参数: {args}")
+        append_log(f"使用的骨干网络: {training_params['backbone']}")
+        append_log(f"Anno Dir Path: {anno_dir}")
+        append_log(f"Image Dir Path: {img_dir}")
+        
+        # 定义图像转换
+        transforms_config = _prepare_transforms()
+        
+        # 运行训练过程
+        try:
+            _run_training_pipeline(
+                training_params, args, transforms_config, 
+                anno_dir, img_dir, model_save_dir, selected_device, selected_gpu_index,
+                ui_components, results_file
+            )
+        except Exception as e:
+            error_msg = f"训练过程中发生错误: {e}"
+            st.error(error_msg)
+            append_log(error_msg)
+            traceback.print_exc()
+            # 更新UI状态
+            ui_components['status'].error("❌ 训练失败")
+            ui_components['progress'].progress(1.0)
     except Exception as e:
-        error_msg = f"训练过程中发生错误: {e}"
+        error_msg = f"训练启动过程中发生错误: {e}"
         st.error(error_msg)
         append_log(error_msg)
         traceback.print_exc()
+        # 更新UI状态
+        ui_components['status'].error("❌ 训练启动失败")
+        ui_components['progress'].progress(1.0)
+    finally:
+        # 确保无论如何都更新UI状态
+        if 'status' in ui_components:
+            current_status = ui_components['status'].empty()
+            if st.session_state.get('stop_requested', False):
+                current_status.warning("⚠️ 训练已停止")
+            elif not current_status._text:  # 如果状态为空
+                current_status.info("✅ 训练已完成")
 
 def _prepare_transforms():
     """准备图像转换"""
