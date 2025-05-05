@@ -163,6 +163,22 @@ def display_history():
         for _, row in df.iterrows():
             with st.expander(f"🔍 {row['model_name']}"):
                 st.json(row.to_dict())
+                # 新增：查看元数据按钮
+                model_name = row.get('model_name', None)
+                best_model_path = row.get('best_model_path', None)
+                if st.button(f"📄 查看元数据 - {model_name}", key=f"view_metadata_btn_{model_name}"):
+                    if best_model_path and os.path.exists(best_model_path):
+                        model_dir = os.path.dirname(best_model_path)
+                        metadata_file = os.path.join(model_dir, f"{model_name}_metadata.json")
+                        if os.path.exists(metadata_file):
+                            with open(metadata_file, 'r', encoding='utf-8') as f:
+                                metadata = json.load(f)
+                            st.success(f"已加载 {model_name} 的元数据：")
+                            st.json(metadata)
+                        else:
+                            st.warning(f"未找到 {model_name} 的元数据文件 ({metadata_file})")
+                    else:
+                        st.warning(f"未找到模型文件，无法定位元数据")
 
 def delete_training_record(model_name, results_file="training_results.json"):
     """删除指定的训练记录
