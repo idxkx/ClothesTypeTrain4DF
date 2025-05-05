@@ -159,6 +159,15 @@ def _execute_training(trainer, device, gpu_index, ui_components, current_run_res
                 append_log("训练被用户中断。")
                 ui_components['status'].warning("⚠️ 训练已停止。")
                 training_interrupted = True
+                # 新增：中断时写入状态和时间
+                current_run_result["status"] = "failed"
+                if not current_run_result.get("date_created"):
+                    current_run_result["date_created"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                all_results = load_results(results_file)
+                all_results = [r for r in all_results if r.get('model_name') != current_run_result['model_name']]
+                all_results.append(current_run_result)
+                save_results(all_results, results_file)
+                append_log(f"训练被中断，已保存记录到 {results_file}")
                 break
             
             ui_components['status'].info(f"Epoch {epoch+1}/{trainer.epochs}: 正在训练...")
@@ -175,6 +184,15 @@ def _execute_training(trainer, device, gpu_index, ui_components, current_run_res
             if st.session_state.get('stop_requested', False):
                 append_log("训练在批次处理中被中断...")
                 training_interrupted = True
+                # 新增：中断时写入状态和时间
+                current_run_result["status"] = "failed"
+                if not current_run_result.get("date_created"):
+                    current_run_result["date_created"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                all_results = load_results(results_file)
+                all_results = [r for r in all_results if r.get('model_name') != current_run_result['model_name']]
+                all_results.append(current_run_result)
+                save_results(all_results, results_file)
+                append_log(f"训练被中断，已保存记录到 {results_file}")
                 break
             
             # 验证阶段
@@ -246,18 +264,15 @@ def _execute_training(trainer, device, gpu_index, ui_components, current_run_res
         append_log(error_msg)
         ui_components['status'].error("❌ 训练失败！")
         traceback.print_exc()
-        
         current_run_result["status"] = "failed"
-        
+        if not current_run_result.get("date_created"):
+            current_run_result["date_created"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         # 即使发生错误也保存训练记录
         all_results = load_results(results_file)
-        # 移除之前的相同模型记录（如果存在）
         all_results = [r for r in all_results if r.get('model_name') != current_run_result['model_name']]
-        # 添加当前记录
         all_results.append(current_run_result)
         save_results(all_results, results_file)
         append_log(f"已保存训练错误记录到 {results_file}")
-        
         return False, float('inf'), None
 
 def _train_epoch(trainer, epoch, ui_components):

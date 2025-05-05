@@ -109,5 +109,30 @@ def fix_training_records():
     
     print(f"已更新训练记录，共 {len(existing_records)} 条记录")
 
+def fix_records(file_path):
+    with open(file_path, 'r', encoding='utf-8') as f:
+        records = json.load(f)
+
+    for r in records:
+        # 修复 date_created
+        if not r.get('date_created') or r['date_created'] == 'None':
+            # 优先用 start_time_str
+            if r.get('start_time_str'):
+                r['date_created'] = r['start_time_str']
+            else:
+                r['date_created'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # 修复 status
+        if r.get('status') in [None, 'ongoing', '进行中']:
+            # 如果训练已完成
+            if r.get('completed_epochs') == r.get('total_epochs'):
+                r['status'] = 'completed'
+            else:
+                r['status'] = 'failed'
+
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(records, f, ensure_ascii=False, indent=2)
+
 if __name__ == "__main__":
-    fix_training_records() 
+    fix_training_records()
+    fix_records('training_results.json')
+    print('修复完成！') 
